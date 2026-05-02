@@ -161,3 +161,21 @@ class AnalyzeResponse(BaseModel):
     confidence: Confidence
     source_statuses: list[SourceStatus]
     synthesis: SynthesisStatus
+
+
+class SavedProfileSummary(BaseModel):
+    id: str
+    place_label: str
+    coordinates: Coordinates | None = None
+    confidence_level: ConfidenceLevel
+    source_statuses: list[SourceStatus]
+    created_at: str
+    updated_at: str
+
+
+class SavedProfile(SavedProfileSummary):
+    response: AnalyzeResponse
+
+
+class DeleteProfileResponse(BaseModel):
+    deleted: bool
