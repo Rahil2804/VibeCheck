@@ -11,13 +11,19 @@ export function useNeighborhood() {
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lastRequest, setLastRequest] = useState(null);
+  const currentProfileRef = useRef(null);
   const saveInFlightRef = useRef(false);
+
+  function setCurrentData(nextData) {
+    currentProfileRef.current = nextData;
+    setData(nextData);
+  }
 
   async function analyze(payload) {
     setLoading(true);
     setError('');
     setSaveError('');
-    setData(null);
+    setCurrentData(null);
     setSavedProfileId(null);
     setLastRequest(payload);
     try {
@@ -27,7 +33,7 @@ export function useNeighborhood() {
         body: JSON.stringify(payload),
       });
       const body = await parseResponse(response, `Analyze failed with ${response.status}`);
-      setData(body);
+      setCurrentData(body);
       return body;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analyze failed');
@@ -58,6 +64,7 @@ export function useNeighborhood() {
 
     saveInFlightRef.current = true;
     setIsSaving(true);
+    const savingProfile = profileData;
     try {
       const response = await fetch(`${API_BASE_URL}/profiles`, {
         method: 'POST',
@@ -65,8 +72,10 @@ export function useNeighborhood() {
         body: JSON.stringify(profileData),
       });
       const body = await parseResponse(response, `Save profile failed with ${response.status}`);
-      setSavedProfileId(body.id);
       await loadSavedProfiles();
+      if (currentProfileRef.current === savingProfile) {
+        setSavedProfileId(body.id);
+      }
       return body;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Save profile failed';
@@ -83,7 +92,7 @@ export function useNeighborhood() {
     setSaveError('');
     const response = await fetch(`${API_BASE_URL}/profiles/${profileId}`);
     const body = await parseResponse(response, `Open saved profile failed with ${response.status}`);
-    setData(body.response);
+    setCurrentData(body.response);
     setSavedProfileId(body.id);
     return body;
   }
@@ -95,7 +104,7 @@ export function useNeighborhood() {
     const body = await parseResponse(response, `Delete saved profile failed with ${response.status}`);
     await loadSavedProfiles();
     if (savedProfileId === profileId) {
-      setData(null);
+      setCurrentData(null);
       setSavedProfileId(null);
       setSaveError('');
     }
@@ -103,7 +112,7 @@ export function useNeighborhood() {
   }
 
   function clearCurrentProfile() {
-    setData(null);
+    setCurrentData(null);
     setError('');
     setSaveError('');
     setSavedProfileId(null);
