@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -8,8 +8,10 @@ export function useNeighborhood() {
   const [savedProfiles, setSavedProfiles] = useState([]);
   const [saveError, setSaveError] = useState('');
   const [savedProfileId, setSavedProfileId] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lastRequest, setLastRequest] = useState(null);
+  const saveInFlightRef = useRef(false);
 
   async function analyze(payload) {
     setLoading(true);
@@ -43,6 +45,10 @@ export function useNeighborhood() {
   }
 
   async function saveCurrentProfile(profileData = data) {
+    if (saveInFlightRef.current) {
+      return null;
+    }
+
     setSaveError('');
     if (!profileData) {
       const message = 'No profile is available to save.';
@@ -50,6 +56,8 @@ export function useNeighborhood() {
       throw new Error(message);
     }
 
+    saveInFlightRef.current = true;
+    setIsSaving(true);
     try {
       const response = await fetch(`${API_BASE_URL}/profiles`, {
         method: 'POST',
@@ -64,6 +72,9 @@ export function useNeighborhood() {
       const message = err instanceof Error ? err.message : 'Save profile failed';
       setSaveError(message);
       throw err;
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
   }
 
@@ -84,9 +95,18 @@ export function useNeighborhood() {
     const body = await parseResponse(response, `Delete saved profile failed with ${response.status}`);
     await loadSavedProfiles();
     if (savedProfileId === profileId) {
+      setData(null);
       setSavedProfileId(null);
+      setSaveError('');
     }
     return body;
+  }
+
+  function clearCurrentProfile() {
+    setData(null);
+    setError('');
+    setSaveError('');
+    setSavedProfileId(null);
   }
 
   function retry() {
@@ -103,10 +123,12 @@ export function useNeighborhood() {
     savedProfiles,
     saveError,
     savedProfileId,
+    isSaving,
     loadSavedProfiles,
     saveCurrentProfile,
     openSavedProfile,
     deleteSavedProfile,
+    clearCurrentProfile,
   };
 }
 

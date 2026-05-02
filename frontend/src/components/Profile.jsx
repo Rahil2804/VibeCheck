@@ -1,9 +1,10 @@
 import Confidence from './Confidence.jsx';
 import ScoreCards from './ScoreCards.jsx';
 
-export default function Profile({ response, onSave, savedProfileId, saveError }) {
+export default function Profile({ response, onSave, savedProfileId, saveError, isSaving }) {
   if (!response) return null;
   const { profile, fit, confidence, source_statuses: statuses, synthesis } = response;
+  const saveButtonText = isSaving ? 'Saving...' : savedProfileId ? 'Saved' : 'Save profile';
   return (
     <section className="profile-stack">
       <div className="profile-actions">
@@ -11,8 +12,8 @@ export default function Profile({ response, onSave, savedProfileId, saveError })
           <p className="eyebrow">Neighborhood profile</p>
           <h2>{response.place.label}</h2>
         </div>
-        <button type="button" className="primary-button" onClick={onSave} disabled={Boolean(savedProfileId)}>
-          {savedProfileId ? 'Saved' : 'Save profile'}
+        <button type="button" className="primary-button" onClick={onSave} disabled={isSaving || Boolean(savedProfileId)}>
+          {saveButtonText}
         </button>
       </div>
       {saveError && <p className="save-error">{saveError}</p>}

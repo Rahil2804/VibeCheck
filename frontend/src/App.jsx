@@ -19,10 +19,12 @@ export default function App() {
     savedProfiles,
     savedProfileId,
     saveError,
+    isSaving,
     loadSavedProfiles,
     saveCurrentProfile,
     openSavedProfile,
     deleteSavedProfile,
+    clearCurrentProfile,
   } = useNeighborhood();
 
   const analyzePayload = useMemo(
@@ -42,22 +44,44 @@ export default function App() {
     loadSavedProfiles().catch(() => null);
   }, []);
 
+  function handleSelectPlace(place) {
+    setSelectedPlace(place);
+    clearCurrentProfile();
+  }
+
+  async function handleOpenSavedProfile(profileId) {
+    const saved = await openSavedProfile(profileId);
+    if (saved?.response?.place) {
+      setSelectedPlace(saved.response.place);
+    }
+  }
+
+  async function handleDeleteSavedProfile(profileId) {
+    const deletingActiveProfile = savedProfileId === profileId;
+    await deleteSavedProfile(profileId);
+    if (deletingActiveProfile) {
+      setSelectedPlace(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="map-stage">
         <MapView selectedPlace={selectedPlace} />
         <div className="top-overlay">
           <p className="eyebrow">VibeCheck</p>
-          <SearchBar onSelect={setSelectedPlace} />
+          <SearchBar onSelect={handleSelectPlace} />
           {!selectedPlace && <p className="hint-line">Select an autocomplete result to fly to the neighborhood.</p>}
         </div>
-        {selectedPlace && (
-          <aside className="analysis-panel">
+        <aside className="analysis-panel">
+          {selectedPlace && (
             <div className="selected-place-card">
               <p className="eyebrow">Selected place</p>
               <h1>{selectedPlace.label}</h1>
               <p>Choose preferences or skip them, then analyze the neighborhood fit.</p>
             </div>
+          )}
+          {selectedPlace && (
             <Questionnaire
               preferences={preferences}
               genericMode={genericMode}
@@ -66,36 +90,37 @@ export default function App() {
               onAnalyze={() => analyzePayload && analyze(analyzePayload)}
               disabled={loading}
             />
-            <SavedProfiles
-              profiles={savedProfiles}
-              onRefresh={() => loadSavedProfiles().catch(() => null)}
-              onOpen={(profileId) => openSavedProfile(profileId).catch(() => null)}
-              onDelete={(profileId) => deleteSavedProfile(profileId).catch(() => null)}
+          )}
+          <SavedProfiles
+            profiles={savedProfiles}
+            onRefresh={() => loadSavedProfiles().catch(() => null)}
+            onOpen={(profileId) => handleOpenSavedProfile(profileId).catch(() => null)}
+            onDelete={(profileId) => handleDeleteSavedProfile(profileId).catch(() => null)}
+          />
+          {loading && <LoadingState />}
+          {error && (
+            <div className="panel-error" role="alert">
+              <strong>Analysis could not finish.</strong>
+              <p>{error}</p>
+              <button type="button" onClick={retry}>Retry</button>
+            </div>
+          )}
+          {!loading && !error && !data && (
+            <div className="empty-profile-state">
+              <strong>Ready when you are.</strong>
+              <p>The profile will show fit, confidence, caveats, source statuses, and neighborhood context.</p>
+            </div>
+          )}
+          {data && (
+            <Profile
+              response={data}
+              savedProfileId={savedProfileId}
+              saveError={saveError}
+              isSaving={isSaving}
+              onSave={() => saveCurrentProfile(data).catch(() => null)}
             />
-            {loading && <LoadingState />}
-            {error && (
-              <div className="panel-error" role="alert">
-                <strong>Analysis could not finish.</strong>
-                <p>{error}</p>
-                <button type="button" onClick={retry}>Retry</button>
-              </div>
-            )}
-            {!loading && !error && !data && (
-              <div className="empty-profile-state">
-                <strong>Ready when you are.</strong>
-                <p>The profile will show fit, confidence, caveats, source statuses, and neighborhood context.</p>
-              </div>
-            )}
-            {data && (
-              <Profile
-                response={data}
-                savedProfileId={savedProfileId}
-                saveError={saveError}
-                onSave={() => saveCurrentProfile(data).catch(() => null)}
-              />
-            )}
-          </aside>
-        )}
+          )}
+        </aside>
       </section>
     </main>
   );
