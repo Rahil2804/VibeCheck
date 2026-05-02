@@ -51,6 +51,12 @@ class SourceStatusCode(StrEnum):
     ERROR = "error"
 
 
+class SynthesisStatusCode(StrEnum):
+    USED = "used"
+    SKIPPED = "skipped"
+    FALLBACK = "fallback"
+
+
 class TrajectoryDirection(StrEnum):
     RISING = "rising"
     STABLE = "stable"
@@ -88,6 +94,12 @@ class SourceStatus(BaseModel):
     status: SourceStatusCode
     message: str
     updated_at: str | None = None
+
+
+class SynthesisStatus(BaseModel):
+    status: SynthesisStatusCode
+    model: str | None = None
+    message: str
 
 
 class Place(BaseModel):
@@ -148,3 +160,4 @@ class AnalyzeResponse(BaseModel):
     fit: FitScore | None = None
     confidence: Confidence
     source_statuses: list[SourceStatus]
+    synthesis: SynthesisStatus

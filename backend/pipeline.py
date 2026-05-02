@@ -12,6 +12,8 @@ from backend.models import (
     SourceName,
     SourceStatus,
     SourceStatusCode,
+    SynthesisStatus,
+    SynthesisStatusCode,
     Trajectory,
     TrajectoryDirection,
     VibeScores,
@@ -60,6 +62,12 @@ async def analyze_neighborhood(
     confidence = build_confidence(statuses)
     fallback_profile = _build_profile(place, source_data)
     synthesizer = profile_synthesizer or synthesize_profile
+    model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    synthesis = SynthesisStatus(
+        status=SynthesisStatusCode.SKIPPED,
+        model=None,
+        message="OpenAI synthesis was skipped; deterministic profile was used.",
+    )
     try:
         profile = await synthesizer(
             place_label=place.label,
@@ -68,6 +76,18 @@ async def analyze_neighborhood(
         )
     except Exception:
         profile = None
+        synthesis = SynthesisStatus(
+            status=SynthesisStatusCode.FALLBACK,
+            model=model_name,
+            message="OpenAI synthesis failed; deterministic fallback profile was used.",
+        )
+    else:
+        if profile is not None:
+            synthesis = SynthesisStatus(
+                status=SynthesisStatusCode.USED,
+                model=model_name,
+                message="OpenAI generated the profile from normalized source data.",
+            )
     if profile is None:
         profile = fallback_profile
     fit = None if request.generic_mode else score_fit(profile, request.preferences)
@@ -78,6 +98,7 @@ async def analyze_neighborhood(
         fit=fit,
         confidence=confidence,
         source_statuses=statuses,
+        synthesis=synthesis,
     )
 
 

@@ -8,6 +8,7 @@ from backend.models import (
     Preferences,
     SourceName,
     SourceStatusCode,
+    SynthesisStatusCode,
     TopPriority,
     Trajectory,
     TrajectoryDirection,
@@ -131,3 +132,67 @@ async def test_pipeline_falls_back_when_synthesizer_fails():
     )
 
     assert "currently available source signals" in response.profile.overview
+
+
+@pytest.mark.asyncio
+async def test_pipeline_reports_synthesis_used_when_synthesizer_returns_profile():
+    async def synthesizer(**_kwargs):
+        return _synthetic_profile()
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="East Austin"),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.HOUSING: _success_adapter,
+            SourceName.REDDIT: _success_adapter,
+            SourceName.ACCESS: _success_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=synthesizer,
+    )
+
+    assert response.synthesis.status == SynthesisStatusCode.USED
+    assert response.synthesis.model is not None
+    assert "OpenAI" in response.synthesis.message
+
+
+@pytest.mark.asyncio
+async def test_pipeline_reports_synthesis_skipped_when_synthesizer_returns_none():
+    async def skipped_synthesizer(**_kwargs):
+        return None
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="East Austin"),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.HOUSING: _success_adapter,
+            SourceName.REDDIT: _success_adapter,
+            SourceName.ACCESS: _success_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=skipped_synthesizer,
+    )
+
+    assert response.synthesis.status == SynthesisStatusCode.SKIPPED
+    assert "deterministic" in response.synthesis.message
+
+
+@pytest.mark.asyncio
+async def test_pipeline_reports_synthesis_fallback_when_synthesizer_fails():
+    async def failing_synthesizer(**_kwargs):
+        raise RuntimeError("model failed")
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="East Austin"),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.HOUSING: _success_adapter,
+            SourceName.REDDIT: _success_adapter,
+            SourceName.ACCESS: _success_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=failing_synthesizer,
+    )
+
+    assert response.synthesis.status == SynthesisStatusCode.FALLBACK
+    assert "fallback" in response.synthesis.message.lower()
