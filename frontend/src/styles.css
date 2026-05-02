@@ -50,6 +50,73 @@ select {
   text-transform: uppercase;
 }
 
+.map-view,
+.map-token-state {
+  position: absolute;
+  inset: 0;
+}
+
+.map-token-state {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #d8e4df;
+  color: #17211b;
+  font-weight: 700;
+}
+
+.top-overlay {
+  position: absolute;
+  left: 24px;
+  top: 24px;
+  width: min(460px, calc(100vw - 48px));
+  z-index: 2;
+}
+
+.search-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(25, 39, 32, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(23, 33, 27, 0.16);
+  padding: 10px;
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-input-wrap input {
+  border: 0;
+  outline: 0;
+  min-height: 36px;
+  width: 100%;
+  background: transparent;
+}
+
+.search-results {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.search-results button {
+  border: 0;
+  border-radius: 6px;
+  background: #f3f6f4;
+  color: #17211b;
+  cursor: pointer;
+  padding: 10px;
+  text-align: left;
+}
+
+.search-error,
+.hint-line {
+  color: #6c342c;
+  font-size: 0.88rem;
+}
+
 .analysis-panel {
   position: absolute;
   right: 24px;
