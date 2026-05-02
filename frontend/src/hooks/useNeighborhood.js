@@ -12,6 +12,7 @@ export function useNeighborhood() {
   const [loading, setLoading] = useState(false);
   const [lastRequest, setLastRequest] = useState(null);
   const currentProfileRef = useRef(null);
+  const analyzeRequestRef = useRef(0);
   const saveInFlightRef = useRef(false);
 
   function setCurrentData(nextData) {
@@ -19,7 +20,14 @@ export function useNeighborhood() {
     setData(nextData);
   }
 
+  function invalidateAnalyzeRequest() {
+    analyzeRequestRef.current += 1;
+    setLoading(false);
+  }
+
   async function analyze(payload) {
+    const requestId = analyzeRequestRef.current + 1;
+    analyzeRequestRef.current = requestId;
     setLoading(true);
     setError('');
     setSaveError('');
@@ -33,13 +41,20 @@ export function useNeighborhood() {
         body: JSON.stringify(payload),
       });
       const body = await parseResponse(response, `Analyze failed with ${response.status}`);
+      if (analyzeRequestRef.current !== requestId) {
+        return null;
+      }
       setCurrentData(body);
       return body;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analyze failed');
+      if (analyzeRequestRef.current === requestId) {
+        setError(err instanceof Error ? err.message : 'Analyze failed');
+      }
       return null;
     } finally {
-      setLoading(false);
+      if (analyzeRequestRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }
 
@@ -90,6 +105,7 @@ export function useNeighborhood() {
   }
 
   async function openSavedProfile(profileId) {
+    invalidateAnalyzeRequest();
     setError('');
     setSaveError('');
     const response = await fetch(`${API_BASE_URL}/profiles/${profileId}`);
@@ -114,6 +130,7 @@ export function useNeighborhood() {
   }
 
   function clearCurrentProfile() {
+    invalidateAnalyzeRequest();
     setCurrentData(null);
     setError('');
     setSaveError('');
