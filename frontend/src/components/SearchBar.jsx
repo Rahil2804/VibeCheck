@@ -35,7 +35,7 @@ export default function SearchBar({ onSelect }) {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={MAPBOX_TOKEN ? 'Search a US address or place' : 'Add VITE_MAPBOX_TOKEN to enable search'}
+          placeholder={MAPBOX_TOKEN ? 'Search a US or Canada address/place' : 'Add VITE_MAPBOX_TOKEN to enable search'}
           disabled={!MAPBOX_TOKEN}
         />
       </label>

@@ -4,7 +4,7 @@ export async function searchPlaces(query) {
   if (!MAPBOX_TOKEN || query.trim().length < 3) return [];
   const params = new URLSearchParams({
     q: query,
-    country: 'us',
+    country: 'us,ca',
     limit: '5',
     access_token: MAPBOX_TOKEN,
   });

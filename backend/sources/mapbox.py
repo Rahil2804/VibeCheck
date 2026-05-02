@@ -26,7 +26,7 @@ async def resolve_place(request: AnalyzeRequest) -> Place:
             url,
             params={
                 "q": request.query,
-                "country": "us",
+                "country": "us,ca",
                 "limit": 1,
                 "access_token": token,
             },
