@@ -127,6 +127,7 @@ export function useNeighborhood() {
   }
 
   async function deleteSavedProfile(profileId) {
+    invalidateOpenRequest();
     const response = await fetch(`${API_BASE_URL}/profiles/${profileId}`, {
       method: 'DELETE',
     });
