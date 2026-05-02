@@ -66,7 +66,7 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-OpenAI is optional. If `OPENAI_API_KEY` is absent or synthesis fails, the backend returns the deterministic profile.
+The backend loads the root `.env` automatically on startup. OpenAI is optional. If `OPENAI_API_KEY` is absent or synthesis fails, the backend returns the deterministic profile.
 
 ## Run Locally
 
@@ -112,6 +112,8 @@ Invoke-RestMethod http://127.0.0.1:8000/analyze `
 Set-Location frontend
 npm.cmd run build
 ```
+
+Backend tests intentionally blank live API keys at pytest startup so they do not depend on a developer's local `.env` or call external services unexpectedly.
 
 ## Data And Confidence Caveats
 

@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.config import load_environment
 from backend.models import AnalyzeRequest, AnalyzeResponse
 from backend.pipeline import analyze_neighborhood
+
+load_environment()
 
 app = FastAPI(title="VibeCheck API")
 

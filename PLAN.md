@@ -288,9 +288,15 @@ Add these only after Phase 1 is stable:
 ### `backend/main.py`
 
 - Create FastAPI app.
+- Load the root `.env` at startup without overriding real process environment variables.
 - Expose `GET /health` and `POST /analyze`.
 - Validate request/response through Pydantic models.
 - Return clear HTTP errors only for invalid requests; source failures should be represented inside `source_statuses`.
+
+### `backend/config.py`
+
+- Centralize local environment loading with `python-dotenv`.
+- Keep local `.env` convenient for development while allowing deployed process environment variables to take precedence.
 
 ### `backend/models.py`
 
@@ -540,6 +546,7 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 ### Phase 1B - AI Layer And Frontend
 
 - [x] Build `synthesizer.py` with OpenAI Structured Outputs and Pydantic parsing.
+- [x] Load root `.env` during backend startup so `OPENAI_API_KEY`, `OPENAI_MODEL`, and backend provider keys are actually available locally.
 - [x] Test invalid/malformed model output handling.
 - [x] Wire `POST /analyze`.
 - [x] Set up React + Vite frontend.
@@ -597,6 +604,7 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 - Unit test fit scoring with no-car, daily-driver, quiet, lively, transit, walkability, parks, and budget-sensitive preferences.
 - Unit test confidence scoring for high, medium, low, and no-profile cases.
 - Mock all external APIs; tests should not require real API keys.
+- Pytest startup should blank live API keys so a developer's local `.env` does not trigger external calls during unit tests.
 - Test that source timeouts/errors produce `source_statuses` and still return partial profiles when possible.
 - Test Structured Output validation rejects malformed model responses.
 - Test that demographics are not read by `scorer.py`.
