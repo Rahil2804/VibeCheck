@@ -65,6 +65,17 @@ select {
   font-weight: 700;
 }
 
+.map-token-state::after {
+  content: "Create frontend/.env with VITE_MAPBOX_TOKEN, then restart npm.cmd run dev.";
+  display: block;
+  max-width: 360px;
+  margin-top: 12px;
+  color: #476057;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+}
+
 .top-overlay {
   position: absolute;
   left: 24px;
@@ -131,6 +142,33 @@ select {
   box-shadow: 0 18px 50px rgba(23, 33, 27, 0.16);
 }
 
+.selected-place-card,
+.empty-profile-state,
+.loading-state,
+.panel-error {
+  border: 1px solid rgba(25, 39, 32, 0.12);
+  border-radius: 8px;
+  background: #f8faf8;
+  padding: 14px;
+}
+
+.selected-place-card {
+  margin-bottom: 16px;
+}
+
+.selected-place-card h1 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.selected-place-card p,
+.empty-profile-state p,
+.panel-error p {
+  margin: 0;
+  line-height: 1.42;
+}
+
 .panel-section {
   display: grid;
   gap: 14px;
@@ -173,8 +211,34 @@ select {
 
 .status-line,
 .panel-error,
-.debug-response {
+.debug-response,
+.empty-profile-state,
+.loading-state {
   margin-top: 16px;
+}
+
+.panel-error {
+  display: grid;
+  gap: 10px;
+  background: #fff7f4;
+  border-color: rgba(138, 60, 50, 0.22);
+  color: #5c2e27;
+}
+
+.loading-state {
+  background: #f4f8f6;
+}
+
+.loading-state strong,
+.empty-profile-state strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.loading-state ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #476057;
 }
 
 .debug-response {
@@ -202,11 +266,39 @@ select {
 .score-card,
 .fit-card,
 .trajectory-card,
+.context-card,
 .pros-cons-grid > div {
   border: 1px solid rgba(25, 39, 32, 0.12);
   border-radius: 8px;
   background: #f8faf8;
   padding: 12px;
+}
+
+.context-card h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+.context-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.context-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.context-card dt {
+  color: #476057;
+}
+
+.context-card dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
 }
 
 .score-card {
@@ -274,7 +366,8 @@ select {
 }
 
 @media (max-width: 760px) {
-  .setup-panel {
+  .setup-panel,
+  .top-overlay {
     left: 12px;
     right: 12px;
     top: 12px;
@@ -289,5 +382,11 @@ select {
     width: auto;
     max-height: 62vh;
     border-radius: 8px 8px 0 0;
+    padding-bottom: 24px;
+  }
+
+  .pros-cons-grid,
+  .score-grid {
+    grid-template-columns: 1fr;
   }
 }

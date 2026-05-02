@@ -12,6 +12,7 @@ export default function Profile({ response }) {
       </div>
       <p className="overview">{profile.overview}</p>
       <ScoreCards scores={profile.vibe_scores} />
+      <WhoLivesHere context={profile.who_lives_here} />
       {fit && (
         <article className="fit-card">
           <span>{fit.label}</span>
@@ -37,4 +38,44 @@ export default function Profile({ response }) {
       <Confidence confidence={confidence} statuses={statuses} />
     </section>
   );
+}
+
+function WhoLivesHere({ context }) {
+  if (!context) return null;
+  const rows = [
+    ['Median age', context.median_age],
+    ['Median household income', formatCurrency(context.median_household_income)],
+    ['Population density', formatNumber(context.population_density)],
+    ['Population trend', context.population_trend],
+  ].filter(([_label, value]) => value !== null && value !== undefined && value !== '');
+
+  if (rows.length === 0) return null;
+
+  return (
+    <article className="context-card">
+      <h3>Context</h3>
+      <dl>
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </article>
+  );
+}
+
+function formatCurrency(value) {
+  if (value === null || value === undefined) return value;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatNumber(value) {
+  if (value === null || value === undefined) return value;
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
 }

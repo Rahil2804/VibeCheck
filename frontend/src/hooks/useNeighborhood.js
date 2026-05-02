@@ -11,6 +11,7 @@ export function useNeighborhood() {
   async function analyze(payload) {
     setLoading(true);
     setError('');
+    setData(null);
     setLastRequest(payload);
     try {
       const response = await fetch(`${API_BASE_URL}/analyze`, {

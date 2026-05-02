@@ -526,36 +526,36 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 
 ### Phase 1A - Backend Foundation
 
-- [ ] Set up backend package, virtual environment, requirements, and `.env.example`.
-- [ ] Define Pydantic request/response/source models.
-- [ ] Add `GET /health`.
-- [ ] Build `mapbox.py` for query/coordinate resolution.
-- [ ] Build source status model and timeout helper.
-- [ ] Build `confidence.py` with unit tests.
-- [ ] Build `scorer.py` with unit tests covering each lifestyle preference.
-- [ ] Build mocked `pipeline.py` that returns partial results.
-- [ ] Add source adapters for Census, housing/affordability, Reddit, and Daily Needs Access scoring.
-- [ ] Test source failure behavior with mocked APIs.
+- [x] Set up backend package, virtual environment, requirements, and `.env.example`.
+- [x] Define Pydantic request/response/source models.
+- [x] Add `GET /health`.
+- [x] Build `mapbox.py` for query/coordinate resolution.
+- [x] Build source status model and timeout helper.
+- [x] Build `confidence.py` with unit tests.
+- [x] Build `scorer.py` with unit tests covering each lifestyle preference.
+- [x] Build mocked `pipeline.py` that returns partial results.
+- [x] Add source adapters for Census, housing/affordability, Reddit, and Daily Needs Access scoring.
+- [x] Test source failure behavior with mocked APIs.
 
 ### Phase 1B - AI Layer And Frontend
 
-- [ ] Build `synthesizer.py` with OpenAI Structured Outputs and Pydantic parsing.
-- [ ] Test invalid/malformed model output handling.
-- [ ] Wire `POST /analyze`.
-- [ ] Set up React + Vite frontend.
-- [ ] Build Mapbox search and map components.
-- [ ] Build neutral questionnaire.
-- [ ] Build profile, score cards, fit score, confidence, and source panel.
-- [ ] Connect frontend to backend and verify one happy-path profile with mocked or real dev keys.
+- [x] Build `synthesizer.py` with OpenAI Structured Outputs and Pydantic parsing.
+- [x] Test invalid/malformed model output handling.
+- [x] Wire `POST /analyze`.
+- [x] Set up React + Vite frontend.
+- [x] Build Mapbox search and map components.
+- [x] Build neutral questionnaire.
+- [x] Build profile, score cards, fit score, confidence, and source panel.
+- [x] Connect frontend to backend and verify one happy-path profile with mocked or real dev keys.
 
 ### Phase 1C - Polish And Demo Readiness
 
-- [ ] Improve loading, empty, error, and low-confidence states.
-- [ ] Add responsive layout checks on desktop and mobile.
-- [ ] Run backend tests and frontend build.
-- [ ] Keep the app runnable locally with clear startup commands.
-- [ ] Write README with setup, architecture, env vars, caveats, and demo screenshots/GIF.
-- [ ] Prepare resume bullets based on implemented features only.
+- [x] Improve loading, empty, error, and low-confidence states.
+- [x] Add responsive layout checks on desktop and mobile.
+- [x] Run backend tests and frontend build.
+- [x] Keep the app runnable locally with clear startup commands.
+- [x] Write README with setup, architecture, env vars, and caveats. Screenshots/GIF intentionally deferred.
+- [x] Prepare resume bullets based on implemented features only.
 
 ### Phase 2 - Comparison, Sharing, And Provenance
 

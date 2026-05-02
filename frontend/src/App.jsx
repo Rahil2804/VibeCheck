@@ -35,6 +35,11 @@ export default function App() {
         </div>
         {selectedPlace && (
           <aside className="analysis-panel">
+            <div className="selected-place-card">
+              <p className="eyebrow">Selected place</p>
+              <h1>{selectedPlace.label}</h1>
+              <p>Choose preferences or skip them, then analyze the neighborhood fit.</p>
+            </div>
             <Questionnaire
               preferences={preferences}
               genericMode={genericMode}
@@ -43,11 +48,18 @@ export default function App() {
               onAnalyze={() => analyzePayload && analyze(analyzePayload)}
               disabled={loading}
             />
-            {loading && <p className="status-line">Checking source availability...</p>}
+            {loading && <LoadingState />}
             {error && (
-              <div className="panel-error">
+              <div className="panel-error" role="alert">
+                <strong>Analysis could not finish.</strong>
                 <p>{error}</p>
                 <button type="button" onClick={retry}>Retry</button>
+              </div>
+            )}
+            {!loading && !error && !data && (
+              <div className="empty-profile-state">
+                <strong>Ready when you are.</strong>
+                <p>The profile will show fit, confidence, caveats, source statuses, and neighborhood context.</p>
               </div>
             )}
             {data && <Profile response={data} />}
@@ -55,5 +67,19 @@ export default function App() {
         )}
       </section>
     </main>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="loading-state" aria-live="polite">
+      <strong>Checking available signals...</strong>
+      <ul>
+        <li>Resolving place context</li>
+        <li>Checking demographic context</li>
+        <li>Reviewing access and affordability signals</li>
+        <li>Preparing confidence and fit explanation</li>
+      </ul>
+    </div>
   );
 }
