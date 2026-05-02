@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import MapView from './components/MapView.jsx';
+import Profile from './components/Profile.jsx';
 import Questionnaire from './components/Questionnaire.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import { useNeighborhood } from './hooks/useNeighborhood.js';
@@ -49,7 +50,7 @@ export default function App() {
                 <button type="button" onClick={retry}>Retry</button>
               </div>
             )}
-            {data && <pre className="debug-response">{JSON.stringify(data.profile, null, 2)}</pre>}
+            {data && <Profile response={data} />}
           </aside>
         )}
       </section>
