@@ -79,7 +79,9 @@ export function useNeighborhood() {
       return body;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Save profile failed';
-      setSaveError(message);
+      if (currentProfileRef.current === savingProfile) {
+        setSaveError(message);
+      }
       throw err;
     } finally {
       saveInFlightRef.current = false;
