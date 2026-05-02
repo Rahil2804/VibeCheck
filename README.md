@@ -57,3 +57,28 @@ Invoke-RestMethod http://127.0.0.1:8000/analyze `
 Fit scoring uses only neutral lifestyle preferences and non-protected
 neighborhood signals. Demographic context is modeled for display only and is
 covered by tests to prevent it from influencing the fit score.
+
+## Run Full Stack Locally
+
+Backend:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload
+```
+
+Frontend:
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+Frontend environment:
+
+```bash
+VITE_MAPBOX_TOKEN=
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+The frontend renders a setup state when `VITE_MAPBOX_TOKEN` is missing. OpenAI is optional; if `OPENAI_API_KEY` is absent or synthesis fails, the backend returns the deterministic profile.
