@@ -1,16 +1,28 @@
 import Confidence from './Confidence.jsx';
 import ScoreCards from './ScoreCards.jsx';
 
-export default function Profile({ response }) {
+export default function Profile({ response, onSave, savedProfileId, saveError }) {
   if (!response) return null;
-  const { profile, fit, confidence, source_statuses: statuses } = response;
+  const { profile, fit, confidence, source_statuses: statuses, synthesis } = response;
   return (
     <section className="profile-stack">
-      <div className="section-heading">
-        <p className="eyebrow">Neighborhood profile</p>
-        <h2>{response.place.label}</h2>
+      <div className="profile-actions">
+        <div className="section-heading">
+          <p className="eyebrow">Neighborhood profile</p>
+          <h2>{response.place.label}</h2>
+        </div>
+        <button type="button" className="primary-button" onClick={onSave} disabled={Boolean(savedProfileId)}>
+          {savedProfileId ? 'Saved' : 'Save profile'}
+        </button>
       </div>
+      {saveError && <p className="save-error">{saveError}</p>}
       <p className="overview">{profile.overview}</p>
+      {synthesis && (
+        <article className={`synthesis-card synthesis-${synthesis.status}`}>
+          <span>AI synthesis: {synthesis.status}</span>
+          <p>{synthesis.message}</p>
+        </article>
+      )}
       <ScoreCards scores={profile.vibe_scores} />
       <WhoLivesHere context={profile.who_lives_here} />
       {fit && (

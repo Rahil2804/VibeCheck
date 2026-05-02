@@ -143,6 +143,7 @@ select {
 }
 
 .selected-place-card,
+.saved-profiles,
 .empty-profile-state,
 .loading-state,
 .panel-error {
@@ -154,6 +155,78 @@ select {
 
 .selected-place-card {
   margin-bottom: 16px;
+}
+
+.saved-profiles {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  background: #f7f9f8;
+}
+
+.saved-profiles-header,
+.saved-row,
+.profile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.saved-profiles-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.saved-profiles-header button,
+.saved-row button {
+  min-height: 34px;
+  border: 1px solid rgba(25, 39, 32, 0.16);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17211b;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.saved-list {
+  display: grid;
+  gap: 6px;
+}
+
+.saved-row {
+  border-top: 1px solid rgba(25, 39, 32, 0.09);
+  padding-top: 6px;
+}
+
+.saved-row > button:first-child {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  min-height: 42px;
+  text-align: left;
+}
+
+.saved-row strong,
+.saved-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-row span,
+.saved-empty {
+  color: #476057;
+  font-size: 0.84rem;
+}
+
+.saved-empty {
+  margin: 0;
+}
+
+.icon-danger {
+  color: #8a3c32 !important;
 }
 
 .selected-place-card h1 {
@@ -200,6 +273,11 @@ select {
   background: #214d3f;
   color: white;
   font-weight: 700;
+}
+
+.primary-button:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .generic-toggle {
@@ -252,6 +330,21 @@ select {
   margin-top: 18px;
 }
 
+.profile-actions {
+  align-items: flex-start;
+}
+
+.profile-actions .primary-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+}
+
+.save-error {
+  margin: -8px 0 0;
+  color: #8a3c32;
+  font-size: 0.88rem;
+}
+
 .overview {
   margin: 0;
   line-height: 1.45;
@@ -265,6 +358,7 @@ select {
 
 .score-card,
 .fit-card,
+.synthesis-card,
 .trajectory-card,
 .context-card,
 .pros-cons-grid > div {
@@ -315,6 +409,34 @@ select {
 .fit-card {
   display: grid;
   gap: 6px;
+}
+
+.synthesis-card {
+  display: grid;
+  gap: 6px;
+}
+
+.synthesis-card span {
+  color: #214d3f;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.synthesis-card p {
+  margin: 0;
+  line-height: 1.42;
+}
+
+.synthesis-used {
+  border-color: rgba(36, 99, 79, 0.24);
+  background: #f3f8f5;
+}
+
+.synthesis-fallback,
+.synthesis-skipped {
+  border-color: rgba(138, 60, 50, 0.2);
+  background: #fff8f5;
 }
 
 .fit-card p,
@@ -388,5 +510,10 @@ select {
   .pros-cons-grid,
   .score-grid {
     grid-template-columns: 1fr;
+  }
+
+  .profile-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

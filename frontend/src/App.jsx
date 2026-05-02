@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import MapView from './components/MapView.jsx';
 import Profile from './components/Profile.jsx';
 import Questionnaire from './components/Questionnaire.jsx';
+import SavedProfiles from './components/SavedProfiles.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import { useNeighborhood } from './hooks/useNeighborhood.js';
 
@@ -9,7 +10,20 @@ export default function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [preferences, setPreferences] = useState({});
   const [genericMode, setGenericMode] = useState(false);
-  const { analyze, data, error, loading, retry } = useNeighborhood();
+  const {
+    analyze,
+    data,
+    error,
+    loading,
+    retry,
+    savedProfiles,
+    savedProfileId,
+    saveError,
+    loadSavedProfiles,
+    saveCurrentProfile,
+    openSavedProfile,
+    deleteSavedProfile,
+  } = useNeighborhood();
 
   const analyzePayload = useMemo(
     () =>
@@ -23,6 +37,10 @@ export default function App() {
         : null,
     [genericMode, preferences, selectedPlace],
   );
+
+  useEffect(() => {
+    loadSavedProfiles().catch(() => null);
+  }, []);
 
   return (
     <main className="app-shell">
@@ -48,6 +66,12 @@ export default function App() {
               onAnalyze={() => analyzePayload && analyze(analyzePayload)}
               disabled={loading}
             />
+            <SavedProfiles
+              profiles={savedProfiles}
+              onRefresh={() => loadSavedProfiles().catch(() => null)}
+              onOpen={(profileId) => openSavedProfile(profileId).catch(() => null)}
+              onDelete={(profileId) => deleteSavedProfile(profileId).catch(() => null)}
+            />
             {loading && <LoadingState />}
             {error && (
               <div className="panel-error" role="alert">
@@ -62,7 +86,14 @@ export default function App() {
                 <p>The profile will show fit, confidence, caveats, source statuses, and neighborhood context.</p>
               </div>
             )}
-            {data && <Profile response={data} />}
+            {data && (
+              <Profile
+                response={data}
+                savedProfileId={savedProfileId}
+                saveError={saveError}
+                onSave={() => saveCurrentProfile(data).catch(() => null)}
+              />
+            )}
           </aside>
         )}
       </section>
