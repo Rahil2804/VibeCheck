@@ -2,7 +2,18 @@ import asyncio
 
 import pytest
 
-from backend.models import AnalyzeRequest, SourceName, SourceStatusCode
+from backend.models import (
+    AnalyzeRequest,
+    NeighborhoodProfile,
+    Preferences,
+    SourceName,
+    SourceStatusCode,
+    TopPriority,
+    Trajectory,
+    TrajectoryDirection,
+    VibeScores,
+    WhoLivesHere,
+)
 from backend.pipeline import analyze_neighborhood
 
 
@@ -55,3 +66,68 @@ async def test_pipeline_converts_source_timeout_to_status():
     statuses = {status.source: status.status for status in response.source_statuses}
     assert statuses[SourceName.CENSUS] == SourceStatusCode.ERROR
     assert any("timed out" in status.message.lower() for status in response.source_statuses)
+
+
+def _synthetic_profile() -> NeighborhoodProfile:
+    return NeighborhoodProfile(
+        overview="Synthesized overview from source data.",
+        vibe_scores=VibeScores(
+            walkability=80,
+            transit_access=75,
+            affordability=45,
+            quiet=55,
+            social_scene=70,
+        ),
+        who_lives_here=WhoLivesHere(),
+        honest_pros=["Synthesized pro."],
+        honest_cons=["Synthesized caveat."],
+        trajectory=Trajectory(
+            direction=TrajectoryDirection.UNCERTAIN,
+            summary="Synthesized trajectory.",
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_pipeline_uses_synthesized_profile_when_available():
+    async def synthesizer(**_kwargs):
+        return _synthetic_profile()
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(
+            query="East Austin",
+            preferences=Preferences(top_priority=TopPriority.TRANSIT_ACCESS),
+        ),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.HOUSING: _success_adapter,
+            SourceName.REDDIT: _success_adapter,
+            SourceName.ACCESS: _success_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=synthesizer,
+    )
+
+    assert response.profile.overview == "Synthesized overview from source data."
+    assert response.fit is not None
+    assert response.fit.score > 50
+
+
+@pytest.mark.asyncio
+async def test_pipeline_falls_back_when_synthesizer_fails():
+    async def failing_synthesizer(**_kwargs):
+        raise RuntimeError("model failed")
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="East Austin"),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.HOUSING: _success_adapter,
+            SourceName.REDDIT: _success_adapter,
+            SourceName.ACCESS: _success_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=failing_synthesizer,
+    )
+
+    assert "currently available source signals" in response.profile.overview

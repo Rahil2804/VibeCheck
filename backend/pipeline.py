@@ -23,8 +23,10 @@ from backend.sources.census import fetch_census_context
 from backend.sources.housing import fetch_housing_context
 from backend.sources.mapbox import resolve_place
 from backend.sources.reddit import fetch_reddit_context
+from backend.synthesizer import synthesize_profile
 
 SourceFetcher = Callable[[], Awaitable[dict[str, Any] | None]]
+ProfileSynthesizer = Callable[..., Awaitable[NeighborhoodProfile | None]]
 
 
 DEFAULT_SOURCE_FETCHERS: dict[SourceName, SourceFetcher] = {
@@ -39,6 +41,7 @@ async def analyze_neighborhood(
     request: AnalyzeRequest,
     source_fetchers: dict[SourceName, SourceFetcher] | None = None,
     source_timeout_seconds: float | None = None,
+    profile_synthesizer: ProfileSynthesizer | None = None,
 ) -> AnalyzeResponse:
     timeout = source_timeout_seconds or float(os.getenv("SOURCE_TIMEOUT_SECONDS", "8"))
     place = await resolve_place(request)
@@ -54,14 +57,26 @@ async def analyze_neighborhood(
     )
     statuses = [place_status, *[status for status, _data in source_results]]
     source_data = {source: data for (status, data), source in zip(source_results, fetchers, strict=True)}
-    profile = _build_profile(place, source_data)
+    confidence = build_confidence(statuses)
+    fallback_profile = _build_profile(place, source_data)
+    synthesizer = profile_synthesizer or synthesize_profile
+    try:
+        profile = await synthesizer(
+            place_label=place.label,
+            source_data={source.value: data for source, data in source_data.items()},
+            caveats=confidence.caveats,
+        )
+    except Exception:
+        profile = None
+    if profile is None:
+        profile = fallback_profile
     fit = None if request.generic_mode else score_fit(profile, request.preferences)
 
     return AnalyzeResponse(
         place=place,
         profile=profile,
         fit=fit,
-        confidence=build_confidence(statuses),
+        confidence=confidence,
         source_statuses=statuses,
     )
 
