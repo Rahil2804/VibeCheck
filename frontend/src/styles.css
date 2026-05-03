@@ -775,6 +775,53 @@ textarea {
 }
 
 @media (max-width: 760px) {
+  .top-bar {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .brand-lockup {
+    display: none;
+  }
+
+  .active-profile-button {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+
+  .top-search {
+    grid-column: 1 / -1;
+  }
+
+  .workspace-backdrop {
+    padding: 104px 12px 12px;
+    place-items: stretch;
+  }
+
+  .profile-workspace {
+    grid-template-columns: 1fr;
+    max-height: calc(100vh - 116px);
+    overflow: auto;
+  }
+
+  .profile-workspace-nav {
+    border-left: 0;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .profile-selection-grid,
+  .workspace-form,
+  .coordinate-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .map-stage > .saved-profiles {
+    left: 12px;
+    right: 12px;
+    top: 104px;
+    bottom: 12px;
+    width: auto;
+  }
+
   .setup-panel,
   .top-overlay {
     left: 12px;
