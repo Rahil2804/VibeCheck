@@ -85,6 +85,66 @@ textarea {
   z-index: 2;
 }
 
+.top-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 12px;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: auto auto minmax(260px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.brand-lockup {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.active-profile-button,
+.top-icon-button {
+  min-height: 34px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.active-profile-button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.top-icon-button {
+  display: grid;
+  width: 34px;
+  place-items: center;
+}
+
+.top-search .search-card {
+  box-shadow: none;
+  padding: 7px 10px;
+}
+
+.top-bar-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #8a3c32;
+  font-size: 0.84rem;
+}
+
 .search-card {
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(25, 39, 32, 0.14);

@@ -4,11 +4,13 @@ import PreferenceProfiles from './components/PreferenceProfiles.jsx';
 import Profile from './components/Profile.jsx';
 import Questionnaire from './components/Questionnaire.jsx';
 import SavedProfiles from './components/SavedProfiles.jsx';
-import SearchBar from './components/SearchBar.jsx';
+import TopBar from './components/TopBar.jsx';
 import { useNeighborhood } from './hooks/useNeighborhood.js';
+import { buildAnalyzePayload } from './utils/preferenceProfiles.js';
 
 export default function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
+  const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [preferences, setPreferences] = useState({});
   const [genericMode, setGenericMode] = useState(false);
   const {
@@ -97,11 +99,13 @@ export default function App() {
     <main className="app-shell">
       <section className="map-stage">
         <MapView selectedPlace={selectedPlace} />
-        <div className="top-overlay">
-          <p className="eyebrow">VibeCheck</p>
-          <SearchBar onSelect={handleSelectPlace} />
-          {!selectedPlace && <p className="hint-line">Select an autocomplete result to fly to the neighborhood.</p>}
-        </div>
+        <TopBar
+          activeProfile={selectedPreferenceProfile}
+          preferenceProfileError={preferenceProfileError}
+          onProfileClick={() => setActiveWorkspace('profiles')}
+          onSavedReportsClick={() => setActiveWorkspace('savedReports')}
+          onSelectPlace={handleSelectPlace}
+        />
         <aside className="analysis-panel">
           {selectedPlace && (
             <div className="selected-place-card">
