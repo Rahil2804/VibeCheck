@@ -196,3 +196,5 @@ async def test_pipeline_reports_synthesis_fallback_when_synthesizer_fails():
 
     assert response.synthesis.status == SynthesisStatusCode.FALLBACK
     assert "fallback" in response.synthesis.message.lower()
+    assert "RuntimeError" in response.synthesis.message
+    assert "model failed" in response.synthesis.message

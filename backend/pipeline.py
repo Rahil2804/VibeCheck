@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -29,6 +30,7 @@ from backend.synthesizer import synthesize_profile
 
 SourceFetcher = Callable[[], Awaitable[dict[str, Any] | None]]
 ProfileSynthesizer = Callable[..., Awaitable[NeighborhoodProfile | None]]
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_SOURCE_FETCHERS: dict[SourceName, SourceFetcher] = {
@@ -74,12 +76,16 @@ async def analyze_neighborhood(
             source_data={source.value: data for source, data in source_data.items()},
             caveats=confidence.caveats,
         )
-    except Exception:
+    except Exception as exc:
+        logger.exception("OpenAI synthesis failed; using deterministic fallback profile.")
         profile = None
         synthesis = SynthesisStatus(
             status=SynthesisStatusCode.FALLBACK,
             model=model_name,
-            message="OpenAI synthesis failed; deterministic fallback profile was used.",
+            message=(
+                "OpenAI synthesis failed; deterministic fallback profile was used. "
+                f"Reason: {_safe_exception_message(exc)}"
+            ),
         )
     else:
         if profile is not None:
@@ -186,3 +192,10 @@ def _score_from(data: dict[str, Any], key: str, default: int) -> int:
     if not isinstance(raw, int | float):
         return default
     return max(0, min(100, int(raw)))
+
+
+def _safe_exception_message(exc: Exception) -> str:
+    message = str(exc).replace("\n", " ").strip()
+    if len(message) > 220:
+        message = f"{message[:217]}..."
+    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
