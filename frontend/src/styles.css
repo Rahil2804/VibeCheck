@@ -14,7 +14,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -143,6 +144,7 @@ select {
 }
 
 .selected-place-card,
+.preference-profiles,
 .saved-profiles,
 .empty-profile-state,
 .loading-state,
@@ -164,6 +166,13 @@ select {
   background: #f7f9f8;
 }
 
+.preference-profiles {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  background: #f7f9f8;
+}
+
 .saved-profiles-header,
 .saved-row,
 .profile-actions {
@@ -179,7 +188,10 @@ select {
 }
 
 .saved-profiles-header button,
-.saved-row button {
+.saved-row button,
+.profile-switcher-row button,
+.profile-chip-row button,
+.profile-form-actions button {
   min-height: 34px;
   border: 1px solid rgba(25, 39, 32, 0.16);
   border-radius: 6px;
@@ -227,6 +239,59 @@ select {
 
 .icon-danger {
   color: #8a3c32 !important;
+}
+
+.profile-switcher-row,
+.profile-chip-row,
+.profile-form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.profile-switcher-row select,
+.preference-profile-form input,
+.preference-profile-form textarea {
+  width: 100%;
+  border: 1px solid rgba(25, 39, 32, 0.18);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.profile-switcher-row select {
+  flex: 1 1 180px;
+}
+
+.preference-profile-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.preference-profile-form textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.category-checklist {
+  border: 1px solid rgba(25, 39, 32, 0.12);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+}
+
+.category-checklist legend {
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.category-checklist label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .selected-place-card h1 {

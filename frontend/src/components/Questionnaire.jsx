@@ -26,6 +26,8 @@ const OPTIONS = {
 export default function Questionnaire({
   preferences,
   genericMode,
+  selectedPreferenceProfile,
+  profileManaged,
   onChange,
   onGenericModeChange,
   onAnalyze,
@@ -39,8 +41,11 @@ export default function Questionnaire({
     <section className="panel-section">
       <div className="section-heading">
         <p className="eyebrow">Preferences</p>
-        <h2>Lifestyle fit</h2>
+        <h2>{selectedPreferenceProfile ? `${selectedPreferenceProfile.name} fit` : 'Lifestyle fit'}</h2>
       </div>
+      {profileManaged && (
+        <p className="hint-line">This analysis will use the selected saved preference profile.</p>
+      )}
       <label className="generic-toggle">
         <input
           type="checkbox"

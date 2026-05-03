@@ -4,14 +4,14 @@ export default function SavedProfiles({ profiles = [], onOpen, onDelete, onRefre
       <div className="saved-profiles-header">
         <div>
           <p className="eyebrow">Saved</p>
-          <h2>Profiles</h2>
+          <h2>Reports</h2>
         </div>
         <button type="button" onClick={onRefresh}>
           Refresh
         </button>
       </div>
       {profiles.length === 0 ? (
-        <p className="saved-empty">Saved profiles will appear here.</p>
+        <p className="saved-empty">Saved neighborhood reports will appear here.</p>
       ) : (
         <div className="saved-list">
           {profiles.map((profile) => (

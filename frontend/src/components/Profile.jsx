@@ -4,7 +4,7 @@ import ScoreCards from './ScoreCards.jsx';
 export default function Profile({ response, onSave, savedProfileId, saveError, isSaving }) {
   if (!response) return null;
   const { profile, fit, confidence, source_statuses: statuses, synthesis } = response;
-  const saveButtonText = isSaving ? 'Saving...' : savedProfileId ? 'Saved' : 'Save profile';
+  const saveButtonText = isSaving ? 'Saving...' : savedProfileId ? 'Saved report' : 'Save report';
   return (
     <section className="profile-stack">
       <div className="profile-actions">

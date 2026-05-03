@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import MapView from './components/MapView.jsx';
+import PreferenceProfiles from './components/PreferenceProfiles.jsx';
 import Profile from './components/Profile.jsx';
 import Questionnaire from './components/Questionnaire.jsx';
 import SavedProfiles from './components/SavedProfiles.jsx';
@@ -20,12 +21,27 @@ export default function App() {
     savedProfileId,
     saveError,
     isSaving,
+    preferenceProfiles,
+    selectedPreferenceProfileId,
+    setSelectedPreferenceProfileId,
+    preferenceProfileError,
+    isSavingPreferenceProfile,
+    loadPreferenceProfiles,
+    createPreferenceProfile,
+    updatePreferenceProfile,
+    deletePreferenceProfile,
+    setDefaultPreferenceProfile,
     loadSavedProfiles,
     saveCurrentProfile,
     openSavedProfile,
     deleteSavedProfile,
     clearCurrentProfile,
   } = useNeighborhood();
+
+  const selectedPreferenceProfile = useMemo(
+    () => preferenceProfiles.find((profile) => profile.id === selectedPreferenceProfileId) || null,
+    [preferenceProfiles, selectedPreferenceProfileId],
+  );
 
   const analyzePayload = useMemo(
     () =>
@@ -35,14 +51,27 @@ export default function App() {
             coordinates: selectedPlace.coordinates,
             preferences,
             generic_mode: genericMode,
+            preference_profile_id: selectedPreferenceProfileId,
           }
         : null,
-    [genericMode, preferences, selectedPlace],
+    [genericMode, preferences, selectedPlace, selectedPreferenceProfileId],
   );
 
   useEffect(() => {
     loadSavedProfiles().catch(() => null);
+    loadPreferenceProfiles().catch(() => null);
   }, []);
+
+  useEffect(() => {
+    if (!selectedPreferenceProfile) return;
+    setPreferences({
+      car_reliance: selectedPreferenceProfile.car_reliance || '',
+      energy_preference: selectedPreferenceProfile.energy_preference || '',
+      top_priority: selectedPreferenceProfile.top_priority || '',
+      budget_sensitivity: selectedPreferenceProfile.budget_sensitivity || '',
+    });
+    setGenericMode(Boolean(selectedPreferenceProfile.generic_mode));
+  }, [selectedPreferenceProfile]);
 
   function handleSelectPlace(place) {
     setSelectedPlace(place);
@@ -82,9 +111,25 @@ export default function App() {
             </div>
           )}
           {selectedPlace && (
+            <PreferenceProfiles
+              profiles={preferenceProfiles}
+              selectedProfileId={selectedPreferenceProfileId}
+              onSelect={setSelectedPreferenceProfileId}
+              onCreate={(profile) => createPreferenceProfile({ ...preferences, generic_mode: genericMode, ...profile })}
+              onUpdate={(profileId, profile) =>
+                updatePreferenceProfile(profileId, { ...preferences, generic_mode: genericMode, ...profile })}
+              onDelete={(profileId) => deletePreferenceProfile(profileId).catch(() => null)}
+              onSetDefault={(profileId) => setDefaultPreferenceProfile(profileId).catch(() => null)}
+              error={preferenceProfileError}
+              isSaving={isSavingPreferenceProfile}
+            />
+          )}
+          {selectedPlace && (
             <Questionnaire
               preferences={preferences}
               genericMode={genericMode}
+              selectedPreferenceProfile={selectedPreferenceProfile}
+              profileManaged={Boolean(selectedPreferenceProfileId)}
               onChange={setPreferences}
               onGenericModeChange={setGenericMode}
               onAnalyze={() => analyzePayload && analyze(analyzePayload)}
