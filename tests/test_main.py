@@ -75,6 +75,61 @@ def test_delete_missing_profile_returns_404(monkeypatch):
     assert response.status_code == 404
 
 
+def test_preference_profile_endpoints_crud_and_default(monkeypatch):
+    _test_sqlite_path(monkeypatch)
+    client = TestClient(app)
+
+    first_response = client.post(
+        "/preference-profiles",
+        json={
+            "name": "Rahil",
+            "car_reliance": "no_car",
+            "top_priority": "transit_access",
+            "must_haves": ["transit"],
+        },
+    )
+    assert first_response.status_code == 200
+    first = first_response.json()
+    assert first["name"] == "Rahil"
+    assert first["is_default"] is True
+
+    second_response = client.post(
+        "/preference-profiles",
+        json={"name": "Budget-first", "budget_sensitivity": "very_budget_conscious"},
+    )
+    assert second_response.status_code == 200
+    second = second_response.json()
+    assert second["is_default"] is False
+
+    list_response = client.get("/preference-profiles")
+    assert list_response.status_code == 200
+    assert [profile["id"] for profile in list_response.json()] == [first["id"], second["id"]]
+
+    update_response = client.put(
+        f"/preference-profiles/{second['id']}",
+        json={"name": "Budget and transit", "must_haves": ["transit", "lower_rent_pressure"]},
+    )
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["name"] == "Budget and transit"
+    assert updated["must_haves"] == ["transit", "lower_rent_pressure"]
+
+    default_response = client.post(f"/preference-profiles/{second['id']}/default")
+    assert default_response.status_code == 200
+    assert default_response.json()["is_default"] is True
+
+    get_response = client.get(f"/preference-profiles/{second['id']}")
+    assert get_response.status_code == 200
+    assert get_response.json()["is_default"] is True
+
+    delete_response = client.delete(f"/preference-profiles/{first['id']}")
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"deleted": True}
+
+    missing_response = client.get(f"/preference-profiles/{first['id']}")
+    assert missing_response.status_code == 404
+
+
 def test_cors_allows_local_vite_origin():
     client = TestClient(app)
 
@@ -83,6 +138,21 @@ def test_cors_allows_local_vite_origin():
         headers={
             "Origin": "http://localhost:5173",
             "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_cors_allows_preference_profile_update_from_local_vite():
+    client = TestClient(app)
+
+    response = client.options(
+        "/preference-profiles/example",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "PUT",
         },
     )
 
