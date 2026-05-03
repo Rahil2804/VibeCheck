@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { resolveSelectedPreferenceProfileId } from '../utils/preferenceProfiles.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -74,13 +75,7 @@ export function useNeighborhood() {
       const body = await parseResponse(response, `Load preference profiles failed with ${response.status}`);
       setPreferenceProfiles(body);
       setPreferenceProfileError('');
-      const defaultProfile = body.find((profile) => profile.is_default) || body[0] || null;
-      setSelectedPreferenceProfileId((current) => {
-        if (current && body.some((profile) => profile.id === current)) {
-          return current;
-        }
-        return defaultProfile?.id || null;
-      });
+      setSelectedPreferenceProfileId((current) => resolveSelectedPreferenceProfileId(body, current));
       return body;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Load preference profiles failed';

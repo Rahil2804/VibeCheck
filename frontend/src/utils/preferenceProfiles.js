@@ -1,0 +1,109 @@
+export const EMPTY_PROFILE_FORM = {
+  name: '',
+  car_reliance: '',
+  energy_preference: '',
+  top_priority: '',
+  budget_sensitivity: '',
+  generic_mode: false,
+  commute_anchor_label: '',
+  commute_anchor_lat: '',
+  commute_anchor_lng: '',
+  max_monthly_rent: '',
+  must_haves: [],
+  deal_breakers: [],
+  notes: '',
+};
+
+export function resolveSelectedPreferenceProfileId(profiles = [], currentProfileId = null) {
+  if (currentProfileId && profiles.some((profile) => profile.id === currentProfileId)) {
+    return currentProfileId;
+  }
+  const defaultProfile = profiles.find((profile) => profile.is_default) || profiles[0] || null;
+  return defaultProfile?.id || null;
+}
+
+export function getActiveProfileLabel(profile) {
+  return `Active profile: ${profile?.name || 'Generic'}`;
+}
+
+export function buildAnalyzePayload(place, activeProfile) {
+  if (!place) return null;
+  const basePayload = {
+    query: place.label,
+    coordinates: place.coordinates,
+  };
+  if (activeProfile?.id) {
+    return {
+      ...basePayload,
+      generic_mode: Boolean(activeProfile.generic_mode),
+      preference_profile_id: activeProfile.id,
+    };
+  }
+  return {
+    ...basePayload,
+    preferences: {},
+    generic_mode: true,
+  };
+}
+
+export function profileToForm(profile) {
+  if (!profile) return { ...EMPTY_PROFILE_FORM, must_haves: [], deal_breakers: [] };
+  return {
+    name: profile.name || '',
+    car_reliance: profile.car_reliance || '',
+    energy_preference: profile.energy_preference || '',
+    top_priority: profile.top_priority || '',
+    budget_sensitivity: profile.budget_sensitivity || '',
+    generic_mode: Boolean(profile.generic_mode),
+    commute_anchor_label: profile.commute_anchor?.label || '',
+    commute_anchor_lat: numberToInput(profile.commute_anchor?.lat),
+    commute_anchor_lng: numberToInput(profile.commute_anchor?.lng),
+    max_monthly_rent: numberToInput(profile.max_monthly_rent),
+    must_haves: profile.must_haves || [],
+    deal_breakers: profile.deal_breakers || [],
+    notes: profile.notes || '',
+  };
+}
+
+export function formToPreferenceProfilePayload(form) {
+  const payload = {
+    name: form.name.trim(),
+    generic_mode: Boolean(form.generic_mode),
+    must_haves: form.must_haves || [],
+    deal_breakers: form.deal_breakers || [],
+  };
+
+  copyIfPresent(payload, 'car_reliance', form.car_reliance);
+  copyIfPresent(payload, 'energy_preference', form.energy_preference);
+  copyIfPresent(payload, 'top_priority', form.top_priority);
+  copyIfPresent(payload, 'budget_sensitivity', form.budget_sensitivity);
+
+  const commuteLabel = form.commute_anchor_label.trim();
+  const commuteLat = form.commute_anchor_lat === '' ? null : Number(form.commute_anchor_lat);
+  const commuteLng = form.commute_anchor_lng === '' ? null : Number(form.commute_anchor_lng);
+  if (commuteLabel) {
+    payload.commute_anchor = { label: commuteLabel };
+    if (commuteLat !== null && commuteLng !== null) {
+      payload.commute_anchor.lat = commuteLat;
+      payload.commute_anchor.lng = commuteLng;
+    }
+  }
+
+  if (form.max_monthly_rent !== '') {
+    payload.max_monthly_rent = Number(form.max_monthly_rent);
+  }
+  if (form.notes.trim()) {
+    payload.notes = form.notes.trim();
+  }
+  return payload;
+}
+
+function copyIfPresent(target, key, value) {
+  if (value) {
+    target[key] = value;
+  }
+}
+
+function numberToInput(value) {
+  return value === null || value === undefined ? '' : String(value);
+}
