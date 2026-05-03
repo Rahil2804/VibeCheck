@@ -1,4 +1,6 @@
-export default function SavedProfiles({ profiles = [], onOpen, onDelete, onRefresh }) {
+export default function SavedProfiles({ open = true, profiles = [], onClose, onOpen, onDelete, onRefresh }) {
+  if (!open) return null;
+
   return (
     <section className="saved-profiles">
       <div className="saved-profiles-header">
@@ -6,9 +8,10 @@ export default function SavedProfiles({ profiles = [], onOpen, onDelete, onRefre
           <p className="eyebrow">Saved</p>
           <h2>Reports</h2>
         </div>
-        <button type="button" onClick={onRefresh}>
-          Refresh
-        </button>
+        <div className="saved-header-actions">
+          <button type="button" onClick={onRefresh}>Refresh</button>
+          {onClose && <button type="button" onClick={onClose}>Close</button>}
+        </div>
       </div>
       {profiles.length === 0 ? (
         <p className="saved-empty">Saved neighborhood reports will appear here.</p>

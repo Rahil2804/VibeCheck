@@ -1,7 +1,7 @@
 import Confidence from './Confidence.jsx';
 import ScoreCards from './ScoreCards.jsx';
 
-export default function Profile({ response, onSave, savedProfileId, saveError, isSaving }) {
+export default function Profile({ response, activePreferenceProfile, onSave, savedProfileId, saveError, isSaving }) {
   if (!response) return null;
   const { profile, fit, confidence, source_statuses: statuses, synthesis } = response;
   const saveButtonText = isSaving ? 'Saving...' : savedProfileId ? 'Saved report' : 'Save report';
@@ -11,6 +11,9 @@ export default function Profile({ response, onSave, savedProfileId, saveError, i
         <div className="section-heading">
           <p className="eyebrow">Neighborhood profile</p>
           <h2>{response.place.label}</h2>
+          <p className="analysis-lens-line">
+            {activePreferenceProfile ? `Analyzed for ${activePreferenceProfile.name}` : 'Generic neighborhood check'}
+          </p>
         </div>
         <button type="button" className="primary-button" onClick={onSave} disabled={isSaving || Boolean(savedProfileId)}>
           {saveButtonText}

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import MapView from './components/MapView.jsx';
 import PreferenceProfiles from './components/PreferenceProfiles.jsx';
 import Profile from './components/Profile.jsx';
-import Questionnaire from './components/Questionnaire.jsx';
 import SavedProfiles from './components/SavedProfiles.jsx';
 import TopBar from './components/TopBar.jsx';
 import { useNeighborhood } from './hooks/useNeighborhood.js';
@@ -11,8 +10,6 @@ import { buildAnalyzePayload } from './utils/preferenceProfiles.js';
 export default function App() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState(null);
-  const [preferences, setPreferences] = useState({});
-  const [genericMode, setGenericMode] = useState(false);
   const {
     analyze,
     data,
@@ -46,34 +43,14 @@ export default function App() {
   );
 
   const analyzePayload = useMemo(
-    () =>
-      selectedPlace
-        ? {
-            query: selectedPlace.label,
-            coordinates: selectedPlace.coordinates,
-            preferences,
-            generic_mode: genericMode,
-            preference_profile_id: selectedPreferenceProfileId,
-          }
-        : null,
-    [genericMode, preferences, selectedPlace, selectedPreferenceProfileId],
+    () => buildAnalyzePayload(selectedPlace, selectedPreferenceProfile),
+    [selectedPlace, selectedPreferenceProfile],
   );
 
   useEffect(() => {
     loadSavedProfiles().catch(() => null);
     loadPreferenceProfiles().catch(() => null);
   }, []);
-
-  useEffect(() => {
-    if (!selectedPreferenceProfile) return;
-    setPreferences({
-      car_reliance: selectedPreferenceProfile.car_reliance || '',
-      energy_preference: selectedPreferenceProfile.energy_preference || '',
-      top_priority: selectedPreferenceProfile.top_priority || '',
-      budget_sensitivity: selectedPreferenceProfile.budget_sensitivity || '',
-    });
-    setGenericMode(Boolean(selectedPreferenceProfile.generic_mode));
-  }, [selectedPreferenceProfile]);
 
   function handleSelectPlace(place) {
     setSelectedPlace(place);
@@ -119,32 +96,28 @@ export default function App() {
           error={preferenceProfileError}
           isSaving={isSavingPreferenceProfile}
         />
+        <SavedProfiles
+          open={activeWorkspace === 'savedReports'}
+          profiles={savedProfiles}
+          onClose={() => setActiveWorkspace(null)}
+          onRefresh={() => loadSavedProfiles().catch(() => null)}
+          onOpen={(profileId) => {
+            handleOpenSavedProfile(profileId).catch(() => null);
+            setActiveWorkspace(null);
+          }}
+          onDelete={(profileId) => handleDeleteSavedProfile(profileId).catch(() => null)}
+        />
         <aside className="analysis-panel">
           {selectedPlace && (
             <div className="selected-place-card">
               <p className="eyebrow">Selected place</p>
               <h1>{selectedPlace.label}</h1>
-              <p>Choose preferences or skip them, then analyze the neighborhood fit.</p>
+              <p>{selectedPreferenceProfile ? `Analyzing for ${selectedPreferenceProfile.name}.` : 'Running a generic neighborhood check.'}</p>
+              <button className="primary-button" type="button" disabled={loading} onClick={() => analyzePayload && analyze(analyzePayload)}>
+                {loading ? 'Analyzing...' : 'Analyze neighborhood'}
+              </button>
             </div>
           )}
-          {selectedPlace && (
-            <Questionnaire
-              preferences={preferences}
-              genericMode={genericMode}
-              selectedPreferenceProfile={selectedPreferenceProfile}
-              profileManaged={Boolean(selectedPreferenceProfileId)}
-              onChange={setPreferences}
-              onGenericModeChange={setGenericMode}
-              onAnalyze={() => analyzePayload && analyze(analyzePayload)}
-              disabled={loading}
-            />
-          )}
-          <SavedProfiles
-            profiles={savedProfiles}
-            onRefresh={() => loadSavedProfiles().catch(() => null)}
-            onOpen={(profileId) => handleOpenSavedProfile(profileId).catch(() => null)}
-            onDelete={(profileId) => handleDeleteSavedProfile(profileId).catch(() => null)}
-          />
           {loading && <LoadingState />}
           {error && (
             <div className="panel-error" role="alert">
@@ -155,13 +128,18 @@ export default function App() {
           )}
           {!loading && !error && !data && (
             <div className="empty-profile-state">
-              <strong>Ready when you are.</strong>
-              <p>The profile will show fit, confidence, caveats, source statuses, and neighborhood context.</p>
+              <strong>{selectedPlace ? 'Ready to analyze.' : 'Choose a place to begin.'}</strong>
+              <p>
+                {selectedPlace
+                  ? 'The profile will show fit, confidence, caveats, source statuses, and neighborhood context.'
+                  : 'Select a saved lifestyle profile or keep Generic active, then search for an address or neighborhood.'}
+              </p>
             </div>
           )}
           {data && (
             <Profile
               response={data}
+              activePreferenceProfile={selectedPreferenceProfile}
               savedProfileId={savedProfileId}
               saveError={saveError}
               isSaving={isSaving}
