@@ -9,6 +9,10 @@ export function useNeighborhood() {
   const [saveError, setSaveError] = useState('');
   const [savedProfileId, setSavedProfileId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [preferenceProfiles, setPreferenceProfiles] = useState([]);
+  const [selectedPreferenceProfileId, setSelectedPreferenceProfileId] = useState(null);
+  const [preferenceProfileError, setPreferenceProfileError] = useState('');
+  const [isSavingPreferenceProfile, setIsSavingPreferenceProfile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lastRequest, setLastRequest] = useState(null);
   const currentProfileRef = useRef(null);
@@ -61,6 +65,108 @@ export function useNeighborhood() {
       if (analyzeRequestRef.current === requestId) {
         setLoading(false);
       }
+    }
+  }
+
+  async function loadPreferenceProfiles() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/preference-profiles`);
+      const body = await parseResponse(response, `Load preference profiles failed with ${response.status}`);
+      setPreferenceProfiles(body);
+      setPreferenceProfileError('');
+      const defaultProfile = body.find((profile) => profile.is_default) || body[0] || null;
+      setSelectedPreferenceProfileId((current) => {
+        if (current && body.some((profile) => profile.id === current)) {
+          return current;
+        }
+        return defaultProfile?.id || null;
+      });
+      return body;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Load preference profiles failed';
+      setPreferenceProfileError(message);
+      return [];
+    }
+  }
+
+  async function createPreferenceProfile(profile) {
+    setIsSavingPreferenceProfile(true);
+    setPreferenceProfileError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/preference-profiles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      });
+      const body = await parseResponse(response, `Create preference profile failed with ${response.status}`);
+      await loadPreferenceProfiles();
+      setSelectedPreferenceProfileId(body.id);
+      return body;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Create preference profile failed';
+      setPreferenceProfileError(message);
+      throw err;
+    } finally {
+      setIsSavingPreferenceProfile(false);
+    }
+  }
+
+  async function updatePreferenceProfile(profileId, profile) {
+    setIsSavingPreferenceProfile(true);
+    setPreferenceProfileError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/preference-profiles/${profileId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      });
+      const body = await parseResponse(response, `Update preference profile failed with ${response.status}`);
+      await loadPreferenceProfiles();
+      setSelectedPreferenceProfileId(body.id);
+      return body;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update preference profile failed';
+      setPreferenceProfileError(message);
+      throw err;
+    } finally {
+      setIsSavingPreferenceProfile(false);
+    }
+  }
+
+  async function deletePreferenceProfile(profileId) {
+    setPreferenceProfileError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/preference-profiles/${profileId}`, {
+        method: 'DELETE',
+      });
+      const body = await parseResponse(response, `Delete preference profile failed with ${response.status}`);
+      const profiles = await loadPreferenceProfiles();
+      if (selectedPreferenceProfileId === profileId) {
+        const defaultProfile = profiles.find((profile) => profile.is_default) || profiles[0] || null;
+        setSelectedPreferenceProfileId(defaultProfile?.id || null);
+      }
+      return body;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Delete preference profile failed';
+      setPreferenceProfileError(message);
+      throw err;
+    }
+  }
+
+  async function setDefaultPreferenceProfile(profileId) {
+    setPreferenceProfileError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/preference-profiles/${profileId}/default`, {
+        method: 'POST',
+      });
+      const body = await parseResponse(response, `Set default preference profile failed with ${response.status}`);
+      await loadPreferenceProfiles();
+      setSelectedPreferenceProfileId(body.id);
+      return body;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Set default preference profile failed';
+      setPreferenceProfileError(message);
+      throw err;
     }
   }
 
@@ -162,9 +268,19 @@ export function useNeighborhood() {
     error,
     loading,
     savedProfiles,
+    preferenceProfiles,
+    selectedPreferenceProfileId,
+    setSelectedPreferenceProfileId,
+    preferenceProfileError,
+    isSavingPreferenceProfile,
     saveError,
     savedProfileId,
     isSaving,
+    loadPreferenceProfiles,
+    createPreferenceProfile,
+    updatePreferenceProfile,
+    deletePreferenceProfile,
+    setDefaultPreferenceProfile,
     loadSavedProfiles,
     saveCurrentProfile,
     openSavedProfile,
