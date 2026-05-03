@@ -1,20 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-
-const EMPTY_FORM = {
-  name: '',
-  car_reliance: '',
-  energy_preference: '',
-  top_priority: '',
-  budget_sensitivity: '',
-  generic_mode: false,
-  commute_anchor_label: '',
-  commute_anchor_lat: '',
-  commute_anchor_lng: '',
-  max_monthly_rent: '',
-  must_haves: [],
-  deal_breakers: [],
-  notes: '',
-};
+import { Check, Plus, Star, Trash2, X } from 'lucide-react';
+import {
+  EMPTY_PROFILE_FORM,
+  formToPreferenceProfilePayload,
+  profileToForm,
+} from '../utils/preferenceProfiles.js';
 
 const CATEGORY_OPTIONS = [
   ['transit', 'Transit'],
@@ -27,9 +17,36 @@ const CATEGORY_OPTIONS = [
   ['lower_rent_pressure', 'Lower rent pressure'],
 ];
 
+const SELECT_OPTIONS = {
+  car_reliance: [
+    ['no_car', 'No car'],
+    ['sometimes_car', 'Sometimes use a car'],
+    ['drive_daily', 'Drive daily'],
+  ],
+  energy_preference: [
+    ['quiet', 'Quiet and calm'],
+    ['balanced', 'Balanced'],
+    ['lively', 'Lively and social'],
+  ],
+  top_priority: [
+    ['walkability_errands', 'Walkability and errands'],
+    ['transit_access', 'Transit access'],
+    ['parks_outdoors', 'Parks and outdoors'],
+    ['restaurants_nightlife', 'Restaurants and nightlife'],
+    ['lower_rent_pressure', 'Lower rent pressure'],
+  ],
+  budget_sensitivity: [
+    ['very_budget_conscious', 'Very budget conscious'],
+    ['moderate', 'Moderate'],
+    ['flexible', 'Flexible'],
+  ],
+};
+
 export default function PreferenceProfiles({
+  open,
   profiles = [],
   selectedProfileId,
+  onClose,
   onSelect,
   onCreate,
   onUpdate,
@@ -44,21 +61,23 @@ export default function PreferenceProfiles({
   );
   const [editingProfile, setEditingProfile] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(EMPTY_PROFILE_FORM);
 
   useEffect(() => {
     if (isCreating) {
-      setForm(EMPTY_FORM);
+      setForm({ ...EMPTY_PROFILE_FORM, must_haves: [], deal_breakers: [] });
     } else if (editingProfile) {
       setForm(profileToForm(editingProfile));
     }
   }, [editingProfile, isCreating]);
 
+  if (!open) return null;
+
   const formOpen = isCreating || Boolean(editingProfile);
 
   async function submitForm(event) {
     event.preventDefault();
-    const payload = formToPayload(form);
+    const payload = formToPreferenceProfilePayload(form);
     if (editingProfile) {
       await onUpdate(editingProfile.id, payload);
     } else {
@@ -66,7 +85,7 @@ export default function PreferenceProfiles({
     }
     setIsCreating(false);
     setEditingProfile(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_PROFILE_FORM, must_haves: [], deal_breakers: [] });
   }
 
   function toggleCategory(field, value) {
@@ -82,123 +101,191 @@ export default function PreferenceProfiles({
   }
 
   return (
-    <section className="preference-profiles">
-      <div className="saved-profiles-header">
-        <div>
-          <p className="eyebrow">Preference profile</p>
-          <h2>{selectedProfile ? selectedProfile.name : 'Generic'}</h2>
-        </div>
-        <button type="button" onClick={() => setIsCreating(true)}>
-          New
-        </button>
-      </div>
+    <section className="workspace-backdrop" aria-label="Lifestyle profile workspace">
+      <div className="profile-workspace">
+        <div className="profile-workspace-main">
+          <div className="workspace-title-row">
+            <div>
+              <p className="eyebrow">Lifestyle Profile</p>
+              <h1>Configure your analysis lens</h1>
+              <p>Set reusable preferences before choosing a neighborhood.</p>
+            </div>
+            <button type="button" className="top-icon-button" onClick={onClose} aria-label="Close profiles">
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
 
-      {profiles.length > 0 ? (
-        <div className="profile-switcher-row">
-          <select value={selectedProfileId || ''} onChange={(event) => onSelect(event.target.value || null)}>
-            <option value="">Generic analysis</option>
+          <div className="profile-selection-grid">
+            <button
+              type="button"
+              className={`profile-choice-card ${selectedProfileId ? '' : 'is-active'}`}
+              onClick={() => onSelect(null)}
+            >
+              <strong>Generic</strong>
+              <span>Run a general neighborhood check without personal fit scoring.</span>
+              {!selectedProfileId && <Check size={18} aria-hidden="true" />}
+            </button>
             {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name}{profile.is_default ? ' (default)' : ''}
+              <button
+                type="button"
+                key={profile.id}
+                className={`profile-choice-card ${profile.id === selectedProfileId ? 'is-active' : ''}`}
+                onClick={() => onSelect(profile.id)}
+              >
+                <strong>{profile.name}</strong>
+                <span>{profile.is_default ? 'Default profile' : 'Saved lifestyle profile'}</span>
+                {profile.id === selectedProfileId && <Check size={18} aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+
+          <div className="profile-workspace-actions">
+            <button type="button" className="primary-button" onClick={() => setIsCreating(true)}>
+              <Plus size={16} aria-hidden="true" />
+              New profile
+            </button>
+            {selectedProfile && (
+              <>
+                <button type="button" onClick={() => setEditingProfile(selectedProfile)}>
+                  Edit selected
+                </button>
+                {!selectedProfile.is_default && (
+                  <button type="button" onClick={() => onSetDefault(selectedProfile.id)}>
+                    <Star size={16} aria-hidden="true" />
+                    Make default
+                  </button>
+                )}
+                <button type="button" className="icon-danger" onClick={() => onDelete(selectedProfile.id)}>
+                  <Trash2 size={16} aria-hidden="true" />
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
+
+          {error && <p className="save-error">{error}</p>}
+
+          {formOpen && (
+            <form className="preference-profile-form workspace-form" onSubmit={submitForm}>
+              <ProfileFormFields form={form} setForm={setForm} toggleCategory={toggleCategory} />
+              <div className="profile-form-actions">
+                <button type="submit" className="primary-button" disabled={isSaving}>
+                  {isSaving ? 'Saving...' : editingProfile ? 'Update profile' : 'Create profile'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreating(false);
+                    setEditingProfile(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        <aside className="profile-workspace-nav">
+          <p className="eyebrow">Neighborhood Analysis</p>
+          <span>Preference Profile</span>
+          <strong>{selectedProfile ? selectedProfile.name : 'Generic'}</strong>
+          <button type="button" onClick={onClose}>Return to map</button>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function ProfileFormFields({ form, setForm, toggleCategory }) {
+  return (
+    <>
+      <label className="field">
+        <span>Name</span>
+        <input
+          value={form.name}
+          onChange={(event) => setForm({ ...form, name: event.target.value })}
+          required
+          maxLength={80}
+        />
+      </label>
+      <label className="generic-toggle">
+        <input
+          type="checkbox"
+          checked={form.generic_mode}
+          onChange={(event) => setForm({ ...form, generic_mode: event.target.checked })}
+        />
+        Run this saved profile as generic
+      </label>
+      {Object.entries(SELECT_OPTIONS).map(([field, options]) => (
+        <label className="field" key={field}>
+          <span>{field.replaceAll('_', ' ')}</span>
+          <select value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })}>
+            <option value="">No preference</option>
+            {options.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
               </option>
             ))}
           </select>
-          {selectedProfile && (
-            <button type="button" onClick={() => setEditingProfile(selectedProfile)}>
-              Edit
-            </button>
-          )}
-        </div>
-      ) : (
-        <p className="saved-empty">Create a reusable profile or keep using generic analysis.</p>
-      )}
-
-      {selectedProfile && (
-        <div className="profile-chip-row">
-          {!selectedProfile.is_default && (
-            <button type="button" onClick={() => onSetDefault(selectedProfile.id)}>
-              Make default
-            </button>
-          )}
-          <button type="button" className="icon-danger" onClick={() => onDelete(selectedProfile.id)}>
-            Delete
-          </button>
-        </div>
-      )}
-
-      {error && <p className="save-error">{error}</p>}
-
-      {formOpen && (
-        <form className="preference-profile-form" onSubmit={submitForm}>
-          <label className="field">
-            <span>Name</span>
-            <input
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-              required
-              maxLength={80}
-            />
-          </label>
-          <label className="generic-toggle">
-            <input
-              type="checkbox"
-              checked={form.generic_mode}
-              onChange={(event) => setForm({ ...form, generic_mode: event.target.checked })}
-            />
-            Run this profile as generic
-          </label>
-          <label className="field">
-            <span>Commute anchor</span>
-            <input
-              value={form.commute_anchor_label}
-              onChange={(event) => setForm({ ...form, commute_anchor_label: event.target.value })}
-              placeholder="Work, school, or general area"
-            />
-          </label>
-          <label className="field">
-            <span>Max monthly rent</span>
-            <input
-              type="number"
-              min="0"
-              value={form.max_monthly_rent}
-              onChange={(event) => setForm({ ...form, max_monthly_rent: event.target.value })}
-            />
-          </label>
-          <CategoryChecklist
-            title="Must haves"
-            values={form.must_haves}
-            onToggle={(value) => toggleCategory('must_haves', value)}
+        </label>
+      ))}
+      <label className="field">
+        <span>Commute anchor</span>
+        <input
+          value={form.commute_anchor_label}
+          onChange={(event) => setForm({ ...form, commute_anchor_label: event.target.value })}
+          placeholder="Work, school, or general area"
+        />
+      </label>
+      <div className="coordinate-grid">
+        <label className="field">
+          <span>Anchor latitude</span>
+          <input
+            type="number"
+            step="any"
+            value={form.commute_anchor_lat}
+            onChange={(event) => setForm({ ...form, commute_anchor_lat: event.target.value })}
           />
-          <CategoryChecklist
-            title="Deal breakers"
-            values={form.deal_breakers}
-            onToggle={(value) => toggleCategory('deal_breakers', value)}
+        </label>
+        <label className="field">
+          <span>Anchor longitude</span>
+          <input
+            type="number"
+            step="any"
+            value={form.commute_anchor_lng}
+            onChange={(event) => setForm({ ...form, commute_anchor_lng: event.target.value })}
           />
-          <label className="field">
-            <span>Notes</span>
-            <textarea
-              value={form.notes}
-              onChange={(event) => setForm({ ...form, notes: event.target.value })}
-              maxLength={1000}
-            />
-          </label>
-          <div className="profile-form-actions">
-            <button type="submit" className="primary-button" disabled={isSaving}>
-              {isSaving ? 'Saving...' : editingProfile ? 'Update profile' : 'Create profile'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsCreating(false);
-                setEditingProfile(null);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-    </section>
+        </label>
+      </div>
+      <label className="field">
+        <span>Max monthly rent</span>
+        <input
+          type="number"
+          min="0"
+          value={form.max_monthly_rent}
+          onChange={(event) => setForm({ ...form, max_monthly_rent: event.target.value })}
+        />
+      </label>
+      <CategoryChecklist
+        title="Must haves"
+        values={form.must_haves}
+        onToggle={(value) => toggleCategory('must_haves', value)}
+      />
+      <CategoryChecklist
+        title="Deal breakers"
+        values={form.deal_breakers}
+        onToggle={(value) => toggleCategory('deal_breakers', value)}
+      />
+      <label className="field notes-field">
+        <span>Notes</span>
+        <textarea
+          value={form.notes}
+          onChange={(event) => setForm({ ...form, notes: event.target.value })}
+          maxLength={1000}
+        />
+      </label>
+    </>
   );
 }
 
@@ -214,39 +301,4 @@ function CategoryChecklist({ title, values, onToggle }) {
       ))}
     </fieldset>
   );
-}
-
-function profileToForm(profile) {
-  return {
-    name: profile.name || '',
-    car_reliance: profile.car_reliance || '',
-    energy_preference: profile.energy_preference || '',
-    top_priority: profile.top_priority || '',
-    budget_sensitivity: profile.budget_sensitivity || '',
-    generic_mode: Boolean(profile.generic_mode),
-    commute_anchor_label: profile.commute_anchor?.label || '',
-    commute_anchor_lat: profile.commute_anchor?.lat ?? '',
-    commute_anchor_lng: profile.commute_anchor?.lng ?? '',
-    max_monthly_rent: profile.max_monthly_rent ?? '',
-    must_haves: profile.must_haves || [],
-    deal_breakers: profile.deal_breakers || [],
-    notes: profile.notes || '',
-  };
-}
-
-function formToPayload(form) {
-  const payload = {
-    name: form.name.trim(),
-    generic_mode: form.generic_mode,
-    must_haves: form.must_haves,
-    deal_breakers: form.deal_breakers,
-  };
-  if (form.commute_anchor_label.trim()) {
-    payload.commute_anchor = { label: form.commute_anchor_label.trim() };
-  }
-  if (form.max_monthly_rent !== '') {
-    payload.max_monthly_rent = Number(form.max_monthly_rent);
-  }
-  payload.notes = form.notes.trim();
-  return payload;
 }

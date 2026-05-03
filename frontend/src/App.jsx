@@ -106,6 +106,19 @@ export default function App() {
           onSavedReportsClick={() => setActiveWorkspace('savedReports')}
           onSelectPlace={handleSelectPlace}
         />
+        <PreferenceProfiles
+          open={activeWorkspace === 'profiles'}
+          profiles={preferenceProfiles}
+          selectedProfileId={selectedPreferenceProfileId}
+          onClose={() => setActiveWorkspace(null)}
+          onSelect={setSelectedPreferenceProfileId}
+          onCreate={createPreferenceProfile}
+          onUpdate={updatePreferenceProfile}
+          onDelete={(profileId) => deletePreferenceProfile(profileId).catch(() => null)}
+          onSetDefault={(profileId) => setDefaultPreferenceProfile(profileId).catch(() => null)}
+          error={preferenceProfileError}
+          isSaving={isSavingPreferenceProfile}
+        />
         <aside className="analysis-panel">
           {selectedPlace && (
             <div className="selected-place-card">
@@ -113,20 +126,6 @@ export default function App() {
               <h1>{selectedPlace.label}</h1>
               <p>Choose preferences or skip them, then analyze the neighborhood fit.</p>
             </div>
-          )}
-          {selectedPlace && (
-            <PreferenceProfiles
-              profiles={preferenceProfiles}
-              selectedProfileId={selectedPreferenceProfileId}
-              onSelect={setSelectedPreferenceProfileId}
-              onCreate={(profile) => createPreferenceProfile({ ...preferences, generic_mode: genericMode, ...profile })}
-              onUpdate={(profileId, profile) =>
-                updatePreferenceProfile(profileId, { ...preferences, generic_mode: genericMode, ...profile })}
-              onDelete={(profileId) => deletePreferenceProfile(profileId).catch(() => null)}
-              onSetDefault={(profileId) => setDefaultPreferenceProfile(profileId).catch(() => null)}
-              error={preferenceProfileError}
-              isSaving={isSavingPreferenceProfile}
-            />
           )}
           {selectedPlace && (
             <Questionnaire
