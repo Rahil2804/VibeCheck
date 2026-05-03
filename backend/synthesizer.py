@@ -2,8 +2,9 @@ import os
 from typing import Any
 
 from openai import AsyncOpenAI
+from pydantic import BaseModel
 
-from backend.models import NeighborhoodProfile
+from backend.models import NeighborhoodProfile, Trajectory, VibeScores, WhoLivesHere
 
 
 class SynthesizerUnavailable(RuntimeError):
@@ -18,8 +19,21 @@ Do not recommend based on protected classes or protected-class proxies.
 Return a schema-valid NeighborhoodProfile."""
 
 
+class SynthesizedProfilePayload(BaseModel):
+    overview: str
+    vibe_scores: VibeScores
+    who_lives_here: WhoLivesHere
+    honest_pros: list[str]
+    honest_cons: list[str]
+    trajectory: Trajectory
+
+
 def parse_profile_payload(payload: dict[str, Any]) -> NeighborhoodProfile:
     return NeighborhoodProfile.model_validate(payload)
+
+
+def _to_neighborhood_profile(payload: SynthesizedProfilePayload) -> NeighborhoodProfile:
+    return NeighborhoodProfile(**payload.model_dump(), provenance={})
 
 
 async def synthesize_profile(
@@ -48,14 +62,14 @@ async def synthesize_profile(
                     ),
                 },
             ],
-            text_format=NeighborhoodProfile,
+            text_format=SynthesizedProfilePayload,
         )
     except Exception as exc:
         raise SynthesizerUnavailable(str(exc)) from exc
 
     parsed = getattr(response, "output_parsed", None)
-    if isinstance(parsed, NeighborhoodProfile):
-        return parsed
+    if isinstance(parsed, SynthesizedProfilePayload):
+        return _to_neighborhood_profile(parsed)
     if isinstance(parsed, dict):
         return parse_profile_payload(parsed)
     raise SynthesizerUnavailable("OpenAI response did not include a parsed NeighborhoodProfile.")
