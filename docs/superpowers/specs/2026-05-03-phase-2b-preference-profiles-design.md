@@ -6,17 +6,21 @@ Add multiple reusable preference profiles so VibeCheck can evaluate every search
 
 Phase 2B should make the app feel more personal without adding accounts, hosted storage, public sharing, or a non-SQLite database.
 
+This revised design moves preference profiles out of the selected-location result flow. A preference profile is the user's reusable analysis lens: who they are and what they care about. The selected neighborhood result panel should focus on the place and its source-aware analysis, not on profile management.
+
 ## Scope
 
 Phase 2B includes:
 
 - Multiple named preference profiles stored in local SQLite.
-- A compact profile switcher in the frontend.
+- A compact app-level active-profile control in the top bar.
+- A Stitch-inspired lifestyle profile workspace for create, edit, delete, select, and default controls.
 - Create, edit, delete, list, and default-profile controls.
 - Expanded fair-housing-safe preference fields.
 - Optional commute anchor storage for later commute scoring.
 - Backend support for analyzing with `preference_profile_id`.
 - Tests for storage, API behavior, and analyze/profile integration.
+- A frontend flow where generic analysis is the default when no saved profile is active.
 
 Phase 2B excludes:
 
@@ -25,12 +29,20 @@ Phase 2B excludes:
 - Public share URLs.
 - Compare mode.
 - Sending freeform user notes to OpenAI.
+- Making the AI synthesis appear deeper by prompt changes alone; later phases should improve analysis quality through richer data sources and provenance.
 
 ## Product Shape
 
-Use a lightweight profile switcher rather than a full profile workspace or wizard. The first screen should still prioritize the map, search, and neighborhood result. The selected profile appears as a compact control near the search/preferences area, for example "Profile: Rahil".
+Use a compact active-profile lens in the top bar and a dedicated profile workspace for management. The first screen should still prioritize the map and search, but the selected profile appears before or beside the address search as an app-level control, for example "Active profile: Rahil" or "Active profile: Generic".
 
-Users can manage profiles from that switcher:
+The default shell should feel close to the Stitch "Map Landing" and "Neighborhood Analysis" screens:
+
+- A top bar contains the VibeCheck brand, active profile control, address/place search, saved reports entry, and small utility controls.
+- The map remains the canvas.
+- The right-side analysis panel appears for location and result states, not for profile management.
+- Profile management opens as a dedicated "Lifestyle Profile" workspace over or beside the map, similar to the Stitch profile management screen.
+
+Users can manage profiles from the lifestyle profile workspace:
 
 - Create a new profile.
 - Edit the selected profile.
@@ -38,7 +50,9 @@ Users can manage profiles from that switcher:
 - Mark one profile as default.
 - Delete a profile, including the only profile.
 
-If no preference profile exists, the app should still be usable. It should show a small create-profile path and allow generic analysis without forcing setup.
+If no preference profile exists, the app should still be usable. The active profile control should show "Generic" and allow immediate address search. It should also provide a clear path to create a lifestyle profile without forcing setup.
+
+The result panel should show the active analysis lens as read-only context, such as "Analyzed for Rahil" or "Generic neighborhood check." It should not contain profile creation, editing, defaulting, deletion, or the full preference questionnaire.
 
 ## Data Model
 
@@ -99,27 +113,45 @@ For Phase 2B, commute anchor and expanded fields are stored and returned, but on
 
 ## Frontend Flow
 
-Add a compact profile selector near the current questionnaire/search controls.
+Move preference selection to the app shell before address selection. The active profile is independent from the selected place and persists across searches.
 
 Expected behavior:
 
 - On app load, fetch preference profiles.
 - Select the default profile automatically when one exists.
-- Populate the questionnaire from the selected profile.
-- When analyzing, send `preference_profile_id` instead of duplicating profile data when a saved profile is selected.
-- Allow generic analysis when no profile is selected.
-- Create and edit profiles in a small dialog or focused inline panel.
+- If no saved profile is selected, show "Generic" as the active analysis lens.
+- Allow search and analysis immediately in generic mode.
+- Show the active profile control in the top bar before or beside the location search.
+- Open a dedicated Stitch-inspired lifestyle profile workspace from the active profile control.
+- Let profile selection, creation, editing, deletion, and defaulting work without a selected place.
+- When analyzing with a saved profile, send `preference_profile_id` instead of duplicating profile data.
+- When analyzing generically, send no `preference_profile_id` and use `generic_mode: true`.
+- Keep preference fields inside the profile workspace rather than in the selected-location analysis flow.
+- The analysis panel should render selected location, analyze action, loading/error states, results, confidence, sources, and saved-report actions only.
 - Keep saved neighborhood reports visible as reports, not user preference profiles.
 
-The UI should rename user-facing saved neighborhood copy where useful to reduce confusion. Existing "Save profile" copy can become "Save neighborhood report" or a similarly clear label during implementation if the touched components make that practical.
+The UI should rename user-facing saved neighborhood copy where useful to reduce confusion. Existing "Save profile" copy should become "Save report" or "Save neighborhood report".
+
+### Component Direction
+
+- `App.jsx` owns active profile, selected place, current workspace/view mode, and analyze payload.
+- The top bar replaces the current scattered search/profile placement with a single app-level control strip.
+- `PreferenceProfiles.jsx` becomes the lifestyle profile workspace rather than an inline analysis-panel widget.
+- `Questionnaire.jsx` should either be removed from the active address flow or reused internally by profile-edit sections.
+- `Profile.jsx` remains focused on neighborhood result rendering.
+- `SavedProfiles.jsx` remains focused on saved neighborhood reports.
+
+### AI Analysis Framing
+
+The UI should avoid implying that the AI can deeply analyze beyond the normalized source payload. The result panel should frame output as source-aware neighborhood analysis with visible confidence, caveats, and source statuses. Later phases should improve perceived and actual analysis depth by adding richer source adapters and provenance, not by simply changing prompt copy.
 
 ## Error Handling
 
-If preference profile list loading fails, show a non-blocking message and keep map/search/analyze usable with raw preferences or generic mode.
+If preference profile list loading fails, show a non-blocking message and keep map/search/analyze usable in generic mode.
 
 If creating, updating, deleting, or setting a default profile fails, show a local error near the profile controls. Do not clear the current neighborhood result.
 
-If a selected profile is deleted, clear the selection and fall back to generic/raw preferences. If another default exists, select it.
+If a selected profile is deleted, clear the selection and fall back to the generic analysis lens. If another default exists, select it.
 
 Deleting the only profile is allowed. The app returns to the no-profile state.
 
@@ -147,17 +179,24 @@ Frontend verification should cover:
 
 - Profiles load on app startup.
 - The default profile is selected automatically.
-- Selecting a profile populates the questionnaire.
+- Generic mode is available before any profile exists.
+- Profile management works without a selected place.
+- Selecting a profile updates the app-level active profile lens.
 - Creating or editing a profile updates the selected profile.
-- Analyze sends `preference_profile_id` when a saved profile is selected.
+- Analyze sends `preference_profile_id` when a saved profile is active.
+- Generic analysis sends no `preference_profile_id`.
+- The analysis panel renders no profile management controls.
 - The frontend build still passes.
 
 ## Acceptance Criteria
 
 - Users can create multiple named preference profiles locally.
 - Users can switch between profiles without losing the map-first search flow.
+- Users can select or create a preference profile before entering/selecting an address.
 - A selected profile is applied to neighborhood analysis.
+- Generic analysis runs when no saved profile is selected.
+- The selected-location analysis panel focuses on location, results, confidence, sources, and saved reports.
+- Profile management is not embedded in the result panel.
 - The existing saved-neighborhood-report flow still works.
-- Generic analysis remains possible.
 - Phase 2B does not introduce accounts, cloud persistence, share URLs, compare mode, or commute routing.
 - `PLAN.md` can mark the preference-profile slice complete after implementation, leaving compare mode and provenance as the next Phase 2 work.
