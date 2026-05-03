@@ -10,6 +10,8 @@ The app opens on a Mapbox 3D map. A user searches for a US or Canadian address/p
 - FastAPI backend with `GET /health` and `POST /analyze`.
 - Pydantic request/response models for the analyze contract.
 - Optional OpenAI Structured Outputs synthesis with deterministic fallback.
+- Visible AI synthesis status showing whether OpenAI was used, skipped, or fallback was used.
+- Explicit SQLite-backed saved profiles with local reopen/delete controls.
 - Source status handling for Mapbox, Census, housing, Reddit, and access data.
 - Partial results when sources fail, time out, or return no MVP data.
 - Rule-based confidence and lifestyle fit scoring.
@@ -64,9 +66,12 @@ Set backend keys in root `.env` when needed:
 MAPBOX_TOKEN=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
+SQLITE_PATH=data/vibecheck.db
 ```
 
 The backend loads the root `.env` automatically on startup. OpenAI is optional. If `OPENAI_API_KEY` is absent or synthesis fails, the backend returns the deterministic profile.
+
+Saved profiles are stored locally in SQLite at `data/vibecheck.db` by default. The `data/` directory is ignored by git and should not contain API keys or raw provider credentials.
 
 ## Run Locally
 
@@ -138,6 +143,6 @@ Backend tests intentionally blank live API keys at pytest startup so they do not
 - Integrated optional OpenAI Structured Outputs synthesis with Pydantic validation and deterministic fallback.
 - Delivered local full-stack setup, API tests, linting, frontend build verification, and clear data caveats.
 
-## Phase 2 Starting Point
+## Phase 2 Status
 
-Phase 2 should begin with saved local profiles, compare mode, and richer provenance/source freshness UI. Avoid adding accounts, public hosting, or share URLs until the anonymous local workflow remains excellent.
+Phase 2A added explicit local saved profiles. The next Phase 2 slices should focus on compare mode and richer provenance/source freshness UI. Avoid adding accounts, public hosting, or share URLs until the anonymous local workflow remains excellent.

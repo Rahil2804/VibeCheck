@@ -489,6 +489,7 @@ Add these only after Phase 1 is stable:
 MAPBOX_TOKEN=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
+SQLITE_PATH=data/vibecheck.db
 RENTCAST_API_KEY=
 REDDIT_CLIENT_ID=
 REDDIT_CLIENT_SECRET=
@@ -503,7 +504,7 @@ Notes:
 
 - `RENTCAST_API_KEY` is optional and not required for the free-first build.
 - No `GOOGLE_MAPS_API_KEY` in MVP.
-- Use local SQLite later if saved profiles are needed.
+- Use local SQLite for saved profiles by default; the database path is controlled by `SQLITE_PATH`.
 - No Railway, Vercel, Redis, Sentry, or auth provider keys are required for personal use.
 
 ---
@@ -566,11 +567,11 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 
 ### Phase 2 - Comparison, Sharing, And Provenance
 
-- [ ] Add SQLite-backed local saved profiles with provider-compliant freshness rules.
+- [x] Add SQLite-backed local saved profiles with provider-compliant freshness rules.
 - [ ] Add public shareable profile URLs only if a hosted demo is later desired.
 - [ ] Add compare mode for two or more places.
 - [ ] Add provenance metadata to major generated claims.
-- [ ] Add UI affordances for source freshness and "why this claim" explanations.
+- [x] Add UI affordances for synthesis status and local saved-profile handling.
 - [ ] Add regression tests for cache freshness, compare response shape, and provenance display.
 
 ### Phase 3 - Data Depth
