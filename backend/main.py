@@ -53,6 +53,16 @@ async def health() -> dict[str, str]:
 
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
+    if request.preference_profile_id is not None:
+        profile = get_preference_profile(request.preference_profile_id)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Preference profile not found.")
+        request = request.model_copy(
+            update={
+                "preferences": profile.preferences,
+                "generic_mode": profile.generic_mode,
+            }
+        )
     return await analyze_neighborhood(request)
 
 

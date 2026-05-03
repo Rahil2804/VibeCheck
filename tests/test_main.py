@@ -158,3 +158,41 @@ def test_cors_allows_preference_profile_update_from_local_vite():
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_analyze_uses_selected_preference_profile(monkeypatch):
+    _test_sqlite_path(monkeypatch)
+    client = TestClient(app)
+    profile_response = client.post(
+        "/preference-profiles",
+        json={
+            "name": "Transit profile",
+            "car_reliance": "no_car",
+            "top_priority": "transit_access",
+            "generic_mode": False,
+        },
+    )
+    assert profile_response.status_code == 200
+    profile_id = profile_response.json()["id"]
+
+    generic_response = client.post(
+        "/analyze",
+        json={"query": "East Austin", "preference_profile_id": profile_id, "generic_mode": True},
+    )
+
+    assert generic_response.status_code == 200
+    body = generic_response.json()
+    assert body["fit"] is not None
+
+
+def test_analyze_returns_404_for_missing_preference_profile(monkeypatch):
+    _test_sqlite_path(monkeypatch)
+    client = TestClient(app)
+
+    response = client.post(
+        "/analyze",
+        json={"query": "East Austin", "preference_profile_id": "missing-profile"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Preference profile not found."
