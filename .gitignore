@@ -209,6 +209,7 @@ tempCodeRunnerFile.py
 
 # Local git worktrees
 .worktrees/
+.superpowers/
 
 # Ruff stuff:
 .ruff_cache/
