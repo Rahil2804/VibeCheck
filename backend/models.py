@@ -1,5 +1,6 @@
 from enum import StrEnum
 from typing import Any
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -28,6 +29,17 @@ class BudgetSensitivity(StrEnum):
     VERY_BUDGET_CONSCIOUS = "very_budget_conscious"
     MODERATE = "moderate"
     FLEXIBLE = "flexible"
+
+
+class PreferenceCategory(StrEnum):
+    TRANSIT = "transit"
+    WALKABILITY = "walkability"
+    PARKS = "parks"
+    GROCERIES = "groceries"
+    RESTAURANTS = "restaurants"
+    QUIET = "quiet"
+    SOCIAL_SCENE = "social_scene"
+    LOWER_RENT_PRESSURE = "lower_rent_pressure"
 
 
 class ConfidenceLevel(StrEnum):
@@ -76,11 +88,80 @@ class Preferences(BaseModel):
     budget_sensitivity: BudgetSensitivity | None = None
 
 
+class CommuteAnchor(BaseModel):
+    label: str = Field(min_length=1)
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def require_both_coordinates(self) -> Self:
+        if (self.lat is None) != (self.lng is None):
+            raise ValueError("Provide both commute anchor latitude and longitude, or neither.")
+        return self
+
+
+class PreferenceProfileBase(Preferences):
+    generic_mode: bool = False
+    commute_anchor: CommuteAnchor | None = None
+    max_monthly_rent: int | None = Field(default=None, ge=0)
+    must_haves: list[PreferenceCategory] = Field(default_factory=list)
+    deal_breakers: list[PreferenceCategory] = Field(default_factory=list)
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @property
+    def preferences(self) -> Preferences:
+        return Preferences(
+            car_reliance=self.car_reliance,
+            energy_preference=self.energy_preference,
+            top_priority=self.top_priority,
+            budget_sensitivity=self.budget_sensitivity,
+        )
+
+
+class PreferenceProfileCreate(PreferenceProfileBase):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class PreferenceProfileUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    car_reliance: CarReliance | None = None
+    energy_preference: EnergyPreference | None = None
+    top_priority: TopPriority | None = None
+    budget_sensitivity: BudgetSensitivity | None = None
+    generic_mode: bool | None = None
+    commute_anchor: CommuteAnchor | None = None
+    max_monthly_rent: int | None = Field(default=None, ge=0)
+    must_haves: list[PreferenceCategory] | None = None
+    deal_breakers: list[PreferenceCategory] | None = None
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @property
+    def preferences(self) -> Preferences:
+        return Preferences(
+            car_reliance=self.car_reliance,
+            energy_preference=self.energy_preference,
+            top_priority=self.top_priority,
+            budget_sensitivity=self.budget_sensitivity,
+        )
+
+
+class PreferenceProfile(PreferenceProfileCreate):
+    id: str
+    is_default: bool = False
+    created_at: str
+    updated_at: str
+
+
+class DeletePreferenceProfileResponse(BaseModel):
+    deleted: bool
+
+
 class AnalyzeRequest(BaseModel):
     query: str | None = Field(default=None, min_length=1)
     coordinates: Coordinates | None = None
     preferences: Preferences = Field(default_factory=Preferences)
     generic_mode: bool = False
+    preference_profile_id: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def require_query_or_coordinates(self) -> "AnalyzeRequest":
