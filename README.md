@@ -145,4 +145,4 @@ Backend tests intentionally blank live API keys at pytest startup so they do not
 
 ## Phase 2 Status
 
-Phase 2A added explicit local saved profiles. The next Phase 2 slices should focus on compare mode and richer provenance/source freshness UI. Avoid adding accounts, public hosting, or share URLs until the anonymous local workflow remains excellent.
+Phase 2A added explicit local saved neighborhood reports. Phase 2B added reusable local preference profiles so a selected profile can be applied across neighborhood analyses. The next Phase 2 slices should focus on compare mode and richer provenance/source freshness UI. Avoid adding accounts, public hosting, or share URLs until the anonymous local workflow remains excellent.

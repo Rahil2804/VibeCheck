@@ -567,7 +567,8 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 
 ### Phase 2 - Comparison, Sharing, And Provenance
 
-- [x] Add SQLite-backed local saved profiles with provider-compliant freshness rules.
+- [x] Add SQLite-backed local saved neighborhood reports with provider-compliant freshness rules.
+- [x] Add reusable SQLite-backed preference profiles that can be applied across neighborhood analyses.
 - [ ] Add public shareable profile URLs only if a hosted demo is later desired.
 - [ ] Add compare mode for two or more places.
 - [ ] Add provenance metadata to major generated claims.
