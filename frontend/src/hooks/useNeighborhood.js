@@ -20,6 +20,7 @@ export function useNeighborhood() {
   const analyzeRequestRef = useRef(0);
   const openRequestRef = useRef(0);
   const saveInFlightRef = useRef(false);
+  const preferenceProfilesInitializedRef = useRef(false);
 
   function setCurrentData(nextData) {
     currentProfileRef.current = nextData;
@@ -75,7 +76,11 @@ export function useNeighborhood() {
       const body = await parseResponse(response, `Load preference profiles failed with ${response.status}`);
       setPreferenceProfiles(body);
       setPreferenceProfileError('');
-      setSelectedPreferenceProfileId((current) => resolveSelectedPreferenceProfileId(body, current));
+      const preferDefault = !preferenceProfilesInitializedRef.current;
+      setSelectedPreferenceProfileId((current) =>
+        resolveSelectedPreferenceProfileId(body, current, { preferDefault }),
+      );
+      preferenceProfilesInitializedRef.current = true;
       return body;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Load preference profiles failed';

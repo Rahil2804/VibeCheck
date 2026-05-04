@@ -77,7 +77,7 @@ export default function PreferenceProfiles({
 
   async function submitForm(event) {
     event.preventDefault();
-    const payload = formToPreferenceProfilePayload(form);
+    const payload = formToPreferenceProfilePayload(form, { mode: editingProfile ? 'update' : 'create' });
     if (editingProfile) {
       await onUpdate(editingProfile.id, payload);
     } else {

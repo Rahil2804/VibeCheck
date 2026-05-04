@@ -271,34 +271,31 @@ def update_preference_profile(
     if current is None:
         return None
 
+    fields_set = update.model_fields_set
     merged = PreferenceProfileCreate(
-        name=update.name if update.name is not None else current.name,
-        car_reliance=update.car_reliance if update.car_reliance is not None else current.car_reliance,
+        name=update.name if "name" in fields_set else current.name,
+        car_reliance=update.car_reliance if "car_reliance" in fields_set else current.car_reliance,
         energy_preference=(
             update.energy_preference
-            if update.energy_preference is not None
+            if "energy_preference" in fields_set
             else current.energy_preference
         ),
-        top_priority=update.top_priority if update.top_priority is not None else current.top_priority,
+        top_priority=update.top_priority if "top_priority" in fields_set else current.top_priority,
         budget_sensitivity=(
             update.budget_sensitivity
-            if update.budget_sensitivity is not None
+            if "budget_sensitivity" in fields_set
             else current.budget_sensitivity
         ),
-        generic_mode=update.generic_mode if update.generic_mode is not None else current.generic_mode,
-        commute_anchor=update.commute_anchor if update.commute_anchor is not None else current.commute_anchor,
+        generic_mode=update.generic_mode if "generic_mode" in fields_set else current.generic_mode,
+        commute_anchor=update.commute_anchor if "commute_anchor" in fields_set else current.commute_anchor,
         max_monthly_rent=(
             update.max_monthly_rent
-            if update.max_monthly_rent is not None
+            if "max_monthly_rent" in fields_set
             else current.max_monthly_rent
         ),
-        must_haves=update.must_haves if update.must_haves is not None else current.must_haves,
-        deal_breakers=(
-            update.deal_breakers
-            if update.deal_breakers is not None
-            else current.deal_breakers
-        ),
-        notes=update.notes if update.notes is not None else current.notes,
+        must_haves=update.must_haves if "must_haves" in fields_set else current.must_haves,
+        deal_breakers=update.deal_breakers if "deal_breakers" in fields_set else current.deal_breakers,
+        notes=update.notes if "notes" in fields_set else current.notes,
     )
     timestamp = _utc_timestamp()
 

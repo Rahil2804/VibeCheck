@@ -189,6 +189,38 @@ def test_update_preference_profile_changes_only_supplied_fields():
     assert updated.deal_breakers == ["quiet"]
 
 
+def test_update_preference_profile_can_clear_optional_fields():
+    db_path = _db_path()
+    initialize_database(db_path)
+    profile = create_preference_profile(
+        PreferenceProfileCreate(
+            name="Original",
+            car_reliance="no_car",
+            commute_anchor={"label": "Office"},
+            max_monthly_rent=2400,
+            notes="Local note.",
+        ),
+        db_path,
+    )
+
+    updated = update_preference_profile(
+        profile.id,
+        PreferenceProfileUpdate(
+            car_reliance=None,
+            commute_anchor=None,
+            max_monthly_rent=None,
+            notes=None,
+        ),
+        db_path,
+    )
+
+    assert updated is not None
+    assert updated.car_reliance is None
+    assert updated.commute_anchor is None
+    assert updated.max_monthly_rent is None
+    assert updated.notes is None
+
+
 def test_delete_preference_profile_removes_only_target_profile():
     db_path = _db_path()
     initialize_database(db_path)
