@@ -14,9 +14,16 @@ export const EMPTY_PROFILE_FORM = {
   notes: '',
 };
 
-export function resolveSelectedPreferenceProfileId(profiles = [], currentProfileId = null) {
+export function resolveSelectedPreferenceProfileId(
+  profiles = [],
+  currentProfileId = null,
+  { preferDefault = true } = {},
+) {
   if (currentProfileId && profiles.some((profile) => profile.id === currentProfileId)) {
     return currentProfileId;
+  }
+  if (!preferDefault) {
+    return null;
   }
   const defaultProfile = profiles.find((profile) => profile.is_default) || profiles[0] || null;
   return defaultProfile?.id || null;
@@ -65,7 +72,8 @@ export function profileToForm(profile) {
   };
 }
 
-export function formToPreferenceProfilePayload(form) {
+export function formToPreferenceProfilePayload(form, { mode = 'create' } = {}) {
+  const includeClears = mode === 'update';
   const payload = {
     name: form.name.trim(),
     generic_mode: Boolean(form.generic_mode),
@@ -73,10 +81,10 @@ export function formToPreferenceProfilePayload(form) {
     deal_breakers: form.deal_breakers || [],
   };
 
-  copyIfPresent(payload, 'car_reliance', form.car_reliance);
-  copyIfPresent(payload, 'energy_preference', form.energy_preference);
-  copyIfPresent(payload, 'top_priority', form.top_priority);
-  copyIfPresent(payload, 'budget_sensitivity', form.budget_sensitivity);
+  copyOptional(payload, 'car_reliance', form.car_reliance, includeClears);
+  copyOptional(payload, 'energy_preference', form.energy_preference, includeClears);
+  copyOptional(payload, 'top_priority', form.top_priority, includeClears);
+  copyOptional(payload, 'budget_sensitivity', form.budget_sensitivity, includeClears);
 
   const commuteLabel = form.commute_anchor_label.trim();
   const commuteLat = form.commute_anchor_lat === '' ? null : Number(form.commute_anchor_lat);
@@ -87,20 +95,28 @@ export function formToPreferenceProfilePayload(form) {
       payload.commute_anchor.lat = commuteLat;
       payload.commute_anchor.lng = commuteLng;
     }
+  } else if (includeClears) {
+    payload.commute_anchor = null;
   }
 
   if (form.max_monthly_rent !== '') {
     payload.max_monthly_rent = Number(form.max_monthly_rent);
+  } else if (includeClears) {
+    payload.max_monthly_rent = null;
   }
   if (form.notes.trim()) {
     payload.notes = form.notes.trim();
+  } else if (includeClears) {
+    payload.notes = null;
   }
   return payload;
 }
 
-function copyIfPresent(target, key, value) {
+function copyOptional(target, key, value, includeClears) {
   if (value) {
     target[key] = value;
+  } else if (includeClears) {
+    target[key] = null;
   }
 }
 

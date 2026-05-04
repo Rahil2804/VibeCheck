@@ -53,6 +53,16 @@ describe('resolveSelectedPreferenceProfileId', () => {
   });
 });
 
+describe('sticky generic profile selection', () => {
+  it('selects the default profile on first load', () => {
+    assert.equal(resolveSelectedPreferenceProfileId(PROFILES, null, { preferDefault: true }), 'profile-2');
+  });
+
+  it('keeps explicit Generic selected after profiles reload', () => {
+    assert.equal(resolveSelectedPreferenceProfileId(PROFILES, null, { preferDefault: false }), null);
+  });
+});
+
 describe('getActiveProfileLabel', () => {
   it('formats a saved active profile', () => {
     assert.equal(getActiveProfileLabel(PROFILES[0]), 'Active profile: Budget walker');
@@ -60,6 +70,44 @@ describe('getActiveProfileLabel', () => {
 
   it('formats generic mode', () => {
     assert.equal(getActiveProfileLabel(null), 'Active profile: Generic');
+  });
+});
+
+describe('profile update payload clearing', () => {
+  it('includes explicit nulls for blank optional fields in update mode', () => {
+    assert.deepEqual(
+      formToPreferenceProfilePayload(
+        {
+          name: 'Budget walker',
+          car_reliance: '',
+          energy_preference: '',
+          top_priority: '',
+          budget_sensitivity: '',
+          generic_mode: false,
+          commute_anchor_label: '',
+          commute_anchor_lat: '',
+          commute_anchor_lng: '',
+          max_monthly_rent: '',
+          must_haves: [],
+          deal_breakers: [],
+          notes: '',
+        },
+        { mode: 'update' },
+      ),
+      {
+        name: 'Budget walker',
+        car_reliance: null,
+        energy_preference: null,
+        top_priority: null,
+        budget_sensitivity: null,
+        generic_mode: false,
+        commute_anchor: null,
+        max_monthly_rent: null,
+        must_haves: [],
+        deal_breakers: [],
+        notes: null,
+      },
+    );
   });
 });
 
