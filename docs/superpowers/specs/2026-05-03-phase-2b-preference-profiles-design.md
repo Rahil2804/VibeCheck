@@ -8,13 +8,16 @@ Phase 2B should make the app feel more personal without adding accounts, hosted 
 
 This revised design moves preference profiles out of the selected-location result flow. A preference profile is the user's reusable analysis lens: who they are and what they care about. The selected neighborhood result panel should focus on the place and its source-aware analysis, not on profile management.
 
+This revision also requires a high-fidelity visual pass against the Google Stitch project named "VibeCheck Neighborhood Analysis Tool." The prior implementation corrected the flow but retained too much of the original green/off-white VibeCheck styling. The next pass should clone the Stitch direction for layout, color, spacing, elevation, and component treatment while preserving the existing working product functionality.
+
 ## Scope
 
 Phase 2B includes:
 
 - Multiple named preference profiles stored in local SQLite.
 - A compact app-level active-profile control in the top bar.
-- A Stitch-inspired lifestyle profile workspace for create, edit, delete, select, and default controls.
+- A Stitch-matched lifestyle profile workspace for create, edit, delete, select, and default controls.
+- A high-fidelity Stitch visual pass for the map landing, neighborhood analysis, lifestyle profile management, and saved reports states.
 - Create, edit, delete, list, and default-profile controls.
 - Expanded fair-housing-safe preference fields.
 - Optional commute anchor storage for later commute scoring.
@@ -41,6 +44,55 @@ The default shell should feel close to the Stitch "Map Landing" and "Neighborhoo
 - The map remains the canvas.
 - The right-side analysis panel appears for location and result states, not for profile management.
 - Profile management opens as a dedicated "Lifestyle Profile" workspace over or beside the map, similar to the Stitch profile management screen.
+
+## High-Fidelity Stitch Visual Contract
+
+The visual target is the Stitch screens, not the current green VibeCheck UI. The implementation should intentionally replace the old visual language where it conflicts with Stitch.
+
+### Shared Shell
+
+- Use a full-screen map canvas with floating glass UI layers.
+- Use the Stitch palette: deep navy/near-black text and structure, action blue for primary controls, cool gray/off-white surfaces, and subtle blue focus/active states.
+- Remove the dominant green/off-white styling from the current UI.
+- Use the Stitch top rail: white translucent bar, compact brand on the left, active profile indicator before location search, search field centered/expanded, saved/profile controls on the right.
+- Use smaller, precise typography and tighter data labels. The interface should read like a spatial analysis tool, not a card-heavy consumer app.
+- Use soft glass shadows and subtle white borders on floating panels.
+
+### Map Landing State
+
+The landing state should resemble the Stitch "Map Landing" screen:
+
+- The map or map-token fallback remains the primary first-viewport signal.
+- If no location is selected, avoid showing a large right analysis panel by default.
+- Show a centered or contextual start card that prompts the user to select a profile or search, while still allowing immediate generic search.
+- Keep market/source status as small floating map controls, not full cards.
+
+### Neighborhood Analysis State
+
+The selected-location state should resemble the Stitch "Neighborhood Analysis" screen:
+
+- Right sidebar is a precision insights panel with the place name, small subtitle, primary save report action, fit score gauge/card, overview, compact score metrics, highlights, and confidence/source footer.
+- Use blue as the active fit/progress color.
+- Keep the map visually dominant and spatially useful.
+- The sidebar should not include preference-profile management or the old questionnaire.
+
+### Lifestyle Profile Workspace
+
+The profile workspace should resemble the Stitch "Profile Management" screen:
+
+- Use a centered glass workspace over a faded/blurred map.
+- Left/main section is the "Lifestyle Profile" editor.
+- Right rail is a navigation/context panel for "Neighborhood Analysis" with items like overview, demographics, saved reports, and priorities.
+- Preference controls should feel like Stitch: structured fields, slider-style rent control where practical, icon/category chips for spatial priorities, and compact note boxes for must-haves/deal breakers.
+- It should not look like a generic stacked admin form.
+
+### Saved Reports Workspace
+
+The saved reports state should resemble the Stitch "Saved Reports" screen:
+
+- Use a right-side saved reports panel over the map.
+- Saved report rows should be compact and report-like, ideally with a small thumbnail/preview placeholder, place name, active profile or report context, score/confidence, open action, and delete action.
+- Keep the map visible behind the panel.
 
 Users can manage profiles from the lifestyle profile workspace:
 
@@ -122,13 +174,14 @@ Expected behavior:
 - If no saved profile is selected, show "Generic" as the active analysis lens.
 - Allow search and analysis immediately in generic mode.
 - Show the active profile control in the top bar before or beside the location search.
-- Open a dedicated Stitch-inspired lifestyle profile workspace from the active profile control.
+- Open a dedicated Stitch-matched lifestyle profile workspace from the active profile control.
 - Let profile selection, creation, editing, deletion, and defaulting work without a selected place.
 - When analyzing with a saved profile, send `preference_profile_id` instead of duplicating profile data.
 - When analyzing generically, send no `preference_profile_id` and use `generic_mode: true`.
 - Keep preference fields inside the profile workspace rather than in the selected-location analysis flow.
 - The analysis panel should render selected location, analyze action, loading/error states, results, confidence, sources, and saved-report actions only.
 - Keep saved neighborhood reports visible as reports, not user preference profiles.
+- Preserve the previously working analyze, save report, open saved report, delete saved report, profile create, profile edit, profile delete, profile default, and generic analysis flows.
 
 The UI should rename user-facing saved neighborhood copy where useful to reduce confusion. Existing "Save profile" copy should become "Save report" or "Save neighborhood report".
 
@@ -140,6 +193,7 @@ The UI should rename user-facing saved neighborhood copy where useful to reduce 
 - `Questionnaire.jsx` should either be removed from the active address flow or reused internally by profile-edit sections.
 - `Profile.jsx` remains focused on neighborhood result rendering.
 - `SavedProfiles.jsx` remains focused on saved neighborhood reports.
+- Shared CSS should be refactored around Stitch tokens or token-like CSS custom properties so old green styles do not leak into the redesigned surfaces.
 
 ### AI Analysis Framing
 
@@ -154,6 +208,10 @@ If creating, updating, deleting, or setting a default profile fails, show a loca
 If a selected profile is deleted, clear the selection and fall back to the generic analysis lens. If another default exists, select it.
 
 Deleting the only profile is allowed. The app returns to the no-profile state.
+
+Generic selection must be a deliberate selectable state. If the user chooses Generic while saved profiles exist, profile reloads should not immediately reselect the default profile unless the app is doing first-load initialization or the active profile was deleted.
+
+Profile editing must preserve existing fields when unchanged and allow the user to clear optional profile fields intentionally where the backend contract supports it. If a field cannot currently be cleared because the backend merge model treats `null` as "unchanged," the UI should avoid presenting that clear action as if it worked, or the implementation plan should include the required backend/API adjustment with tests.
 
 ## Privacy And Safety
 
@@ -186,6 +244,12 @@ Frontend verification should cover:
 - Analyze sends `preference_profile_id` when a saved profile is active.
 - Generic analysis sends no `preference_profile_id`.
 - The analysis panel renders no profile management controls.
+- The visual shell is checked against the Stitch map landing, analysis, profile management, and saved reports references.
+- Search results remain clickable from the top bar.
+- Generic remains selectable even when saved profiles exist.
+- Profile create, edit, delete, and default actions update the active profile state correctly.
+- Analyze works for generic mode and saved-profile mode.
+- Save report, open saved report, and delete saved report still work after moving saved reports out of the analysis panel.
 - The frontend build still passes.
 
 ## Acceptance Criteria
@@ -197,6 +261,8 @@ Frontend verification should cover:
 - Generic analysis runs when no saved profile is selected.
 - The selected-location analysis panel focuses on location, results, confidence, sources, and saved reports.
 - Profile management is not embedded in the result panel.
+- The UI visually matches the Stitch reference direction for the top rail, map landing, analysis sidebar, lifestyle profile workspace, and saved reports panel.
+- Previously working functionality remains working: search, generic analysis, saved-profile analysis, profile CRUD/default, saved report CRUD, and retry.
 - The existing saved-neighborhood-report flow still works.
 - Phase 2B does not introduce accounts, cloud persistence, share URLs, compare mode, or commute routing.
 - `PLAN.md` can mark the preference-profile slice complete after implementation, leaving compare mode and provenance as the next Phase 2 work.
