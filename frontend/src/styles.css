@@ -12,6 +12,10 @@
   --vc-danger: #ba1a1a;
   --vc-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
   --vc-shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.14);
+  --layer-map-control: 10;
+  --layer-top-bar: 20;
+  --layer-panel: 30;
+  --layer-workspace: 40;
   color: var(--vc-text);
   background: var(--vc-bg);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -99,7 +103,7 @@ textarea {
   left: 24px;
   top: 24px;
   width: min(460px, calc(100vw - 48px));
-  z-index: 2;
+  z-index: var(--layer-map-control);
 }
 
 .top-bar {
@@ -107,7 +111,7 @@ textarea {
   left: 10px;
   right: 10px;
   top: 10px;
-  z-index: 4;
+  z-index: var(--layer-top-bar);
   display: grid;
   grid-template-columns: auto minmax(150px, auto) minmax(280px, 1fr) auto;
   gap: 8px;
@@ -230,6 +234,7 @@ textarea {
   right: 18px;
   top: 84px;
   bottom: 18px;
+  z-index: var(--layer-panel);
   width: min(410px, calc(100vw - 36px));
   overflow: auto;
   background: var(--vc-glass-strong);
@@ -256,7 +261,7 @@ textarea {
   position: absolute;
   left: 50%;
   top: 50%;
-  z-index: 2;
+  z-index: var(--layer-map-control);
   display: grid;
   gap: 10px;
   width: min(360px, calc(100vw - 48px));
@@ -321,7 +326,7 @@ textarea {
   position: absolute;
   left: 22px;
   bottom: 22px;
-  z-index: 2;
+  z-index: var(--layer-map-control);
   display: flex;
   gap: 10px;
   align-items: center;
@@ -404,7 +409,10 @@ textarea {
 
 .saved-list {
   display: grid;
-  gap: 6px;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .saved-row {
@@ -533,18 +541,19 @@ textarea {
 .workspace-backdrop {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: var(--layer-workspace);
   display: grid;
-  place-items: start center;
-  padding: 84px 24px 24px;
-  background: rgba(248, 250, 252, 0.38);
-  backdrop-filter: blur(4px);
+  place-items: center;
+  padding: 72px 24px 24px;
+  background: rgba(248, 250, 252, 0.42);
+  backdrop-filter: blur(8px);
 }
 
 .profile-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 680px) 290px;
-  width: min(980px, 100%);
+  grid-template-columns: minmax(0, 700px) 290px;
+  width: min(1010px, 100%);
+  max-height: calc(100vh - 112px);
   border: 1px solid var(--vc-border-light);
   border-radius: 16px;
   background: var(--vc-glass-strong);
@@ -555,6 +564,8 @@ textarea {
 .profile-workspace-main {
   display: grid;
   gap: 18px;
+  min-height: 0;
+  overflow: auto;
   padding: 28px;
 }
 
@@ -576,45 +587,6 @@ textarea {
   color: var(--vc-muted);
 }
 
-.profile-selection-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.profile-choice-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 10px;
-  min-height: 82px;
-  border: 1px solid var(--vc-border);
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--vc-text);
-  cursor: pointer;
-  padding: 12px;
-  text-align: left;
-}
-
-.profile-choice-card span {
-  grid-column: 1 / -1;
-  color: var(--vc-muted);
-  font-size: 0.86rem;
-}
-
-.profile-choice-card.is-active {
-  border-color: rgba(37, 99, 235, 0.65);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-
-.profile-workspace-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.profile-workspace-actions button,
 .profile-workspace-nav button {
   min-height: 36px;
   border: 1px solid var(--vc-border);
@@ -623,14 +595,6 @@ textarea {
   color: var(--vc-text);
   cursor: pointer;
   padding: 0 12px;
-}
-
-.profile-workspace-actions .primary-button {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  background: var(--vc-blue);
-  color: #ffffff;
 }
 
 .workspace-form {
@@ -657,10 +621,26 @@ textarea {
   gap: 10px;
 }
 
+.profile-form-actions {
+  position: sticky;
+  bottom: -28px;
+  z-index: 1;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin: 4px -28px -28px;
+  padding: 16px 28px;
+  border-top: 1px solid var(--vc-border);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+}
+
 .profile-workspace-nav {
   display: grid;
   align-content: start;
   gap: 12px;
+  min-height: 0;
+  overflow: auto;
   padding: 24px;
   background: rgba(248, 250, 252, 0.78);
   border-left: 1px solid rgba(15, 23, 42, 0.08);
@@ -669,6 +649,53 @@ textarea {
 .profile-workspace-nav span {
   color: var(--vc-muted);
   font-size: 0.9rem;
+}
+
+.profile-rail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-rail-item {
+  display: grid;
+  gap: 2px;
+  min-height: 58px;
+  border: 1px solid var(--vc-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--vc-text);
+  cursor: pointer;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.profile-rail-item span {
+  color: var(--vc-muted);
+  font-size: 0.78rem;
+}
+
+.profile-rail-item.is-active {
+  border-color: rgba(37, 99, 235, 0.7);
+  background: var(--vc-blue-soft);
+}
+
+.profile-rail-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.profile-rail-actions button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.profile-workspace-nav .primary-button {
+  background: var(--vc-blue);
+  color: #ffffff;
 }
 
 .selected-place-card h1 {
@@ -803,13 +830,24 @@ textarea {
   right: 24px;
   top: 84px;
   bottom: 24px;
-  z-index: 3;
-  width: min(360px, calc(100vw - 48px));
-  overflow: auto;
+  z-index: var(--layer-panel);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(380px, calc(100vw - 48px));
+  overflow: hidden;
   border-color: rgba(255, 255, 255, 0.75);
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.14);
   backdrop-filter: blur(10px);
+}
+
+.saved-report-footer {
+  border-top: 1px solid var(--vc-border);
+  padding-top: 12px;
+}
+
+.saved-report-footer .primary-button {
+  width: 100%;
 }
 
 .save-error {
@@ -1106,9 +1144,10 @@ textarea {
     border-top: 1px solid rgba(15, 23, 42, 0.08);
   }
 
-  .profile-selection-grid,
   .workspace-form,
-  .coordinate-grid {
+  .coordinate-grid,
+  .preference-select-grid,
+  .profile-rail-actions {
     grid-template-columns: 1fr;
   }
 

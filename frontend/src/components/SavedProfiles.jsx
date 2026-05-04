@@ -5,8 +5,8 @@ export default function SavedProfiles({ open = true, profiles = [], onClose, onO
     <section className="saved-profiles">
       <div className="saved-profiles-header">
         <div>
-          <p className="eyebrow">Saved</p>
-          <h2>Reports</h2>
+          <p className="eyebrow">Saved Reports</p>
+          <h2>Neighborhood Intelligence</h2>
         </div>
         <div className="saved-header-actions">
           <button type="button" onClick={onRefresh}>Refresh</button>
@@ -22,7 +22,7 @@ export default function SavedProfiles({ open = true, profiles = [], onClose, onO
               <div className="saved-thumb" aria-hidden="true"></div>
               <button type="button" onClick={() => onOpen(profile.id)}>
                 <strong>{profile.place_label}</strong>
-                <span>{profile.confidence_level} confidence</span>
+                <span>{profile.confidence_level} confidence · Open report</span>
               </button>
               <button
                 type="button"
@@ -36,6 +36,9 @@ export default function SavedProfiles({ open = true, profiles = [], onClose, onO
           ))}
         </div>
       )}
+      <div className="saved-report-footer">
+        <button type="button" className="primary-button">Export Report</button>
+      </div>
     </section>
   );
 }

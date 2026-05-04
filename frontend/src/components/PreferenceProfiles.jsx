@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Plus, Star, Trash2, X } from 'lucide-react';
+import { Plus, Star, Trash2, X } from 'lucide-react';
 import {
   EMPTY_PROFILE_FORM,
   formToPreferenceProfilePayload,
@@ -7,13 +7,13 @@ import {
 } from '../utils/preferenceProfiles.js';
 
 const CATEGORY_OPTIONS = [
-  ['transit', 'Transit', '▦'],
-  ['walkability', 'Walkability', '⇄'],
-  ['parks', 'Green spaces', '♧'],
-  ['groceries', 'Retail access', '□'],
-  ['restaurants', 'Dining', '◌'],
-  ['quiet', 'Quiet', '◒'],
-  ['social_scene', 'Nightlife', '✦'],
+  ['transit', 'Transit', 'T'],
+  ['walkability', 'Walkability', 'W'],
+  ['parks', 'Green spaces', 'G'],
+  ['groceries', 'Retail access', 'R'],
+  ['restaurants', 'Dining', 'D'],
+  ['quiet', 'Quiet', 'Q'],
+  ['social_scene', 'Nightlife', 'N'],
   ['lower_rent_pressure', 'Rent pressure', '$'],
 ];
 
@@ -64,22 +64,32 @@ export default function PreferenceProfiles({
   const [form, setForm] = useState(EMPTY_PROFILE_FORM);
 
   useEffect(() => {
+    if (!open) return;
     if (isCreating) {
       setForm({ ...EMPTY_PROFILE_FORM, must_haves: [], deal_breakers: [] });
-    } else if (editingProfile) {
-      setForm(profileToForm(editingProfile));
+      return;
     }
-  }, [editingProfile, isCreating]);
+    if (editingProfile) {
+      setForm(profileToForm(editingProfile));
+      return;
+    }
+    if (selectedProfile) {
+      setForm(profileToForm(selectedProfile));
+      return;
+    }
+    setForm({ ...EMPTY_PROFILE_FORM, must_haves: [], deal_breakers: [] });
+  }, [editingProfile, isCreating, open, selectedProfile]);
 
   if (!open) return null;
 
-  const formOpen = isCreating || Boolean(editingProfile);
+  const activeEditorProfile = editingProfile || selectedProfile;
+  const isEditingExisting = Boolean(activeEditorProfile) && !isCreating;
 
   async function submitForm(event) {
     event.preventDefault();
-    const payload = formToPreferenceProfilePayload(form, { mode: editingProfile ? 'update' : 'create' });
-    if (editingProfile) {
-      await onUpdate(editingProfile.id, payload);
+    const payload = formToPreferenceProfilePayload(form, { mode: isEditingExisting ? 'update' : 'create' });
+    if (isEditingExisting) {
+      await onUpdate(activeEditorProfile.id, payload);
     } else {
       await onCreate(payload);
     }
@@ -107,90 +117,88 @@ export default function PreferenceProfiles({
           <div className="workspace-title-row">
             <div>
               <p className="eyebrow">Lifestyle Profile</p>
-              <h1>Configure your analysis lens</h1>
-              <p>Set reusable preferences before choosing a neighborhood.</p>
+              <h1>{isEditingExisting ? 'Edit analysis lens' : 'Create analysis lens'}</h1>
+              <p>Configure reusable preferences before choosing a neighborhood.</p>
             </div>
             <button type="button" className="top-icon-button" onClick={onClose} aria-label="Close profiles">
               <X size={18} aria-hidden="true" />
             </button>
           </div>
 
-          <div className="profile-selection-grid">
+          {error && <p className="save-error">{error}</p>}
+
+          <form className="preference-profile-form workspace-form" onSubmit={submitForm}>
+            <ProfileFormFields form={form} setForm={setForm} toggleCategory={toggleCategory} />
+            <div className="profile-form-actions">
+              <button type="button" onClick={onClose}>Cancel</button>
+              <button type="submit" className="primary-button" disabled={isSaving}>
+                {isSaving ? 'Saving...' : isEditingExisting ? 'Save Profile' : 'Create Profile'}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <aside className="profile-workspace-nav">
+          <div>
+            <p className="eyebrow">Neighborhood Analysis</p>
+            <span>Active lens</span>
+            <strong>{selectedProfile ? selectedProfile.name : 'Generic'}</strong>
+          </div>
+          <div className="profile-rail-list">
             <button
               type="button"
-              className={`profile-choice-card ${selectedProfileId ? '' : 'is-active'}`}
-              onClick={() => onSelect(null)}
+              className={`profile-rail-item ${selectedProfileId ? '' : 'is-active'}`}
+              onClick={() => {
+                setIsCreating(false);
+                setEditingProfile(null);
+                onSelect(null);
+              }}
             >
               <strong>Generic</strong>
-              <span>Run a general neighborhood check without personal fit scoring.</span>
-              {!selectedProfileId && <Check size={18} aria-hidden="true" />}
+              <span>General check</span>
             </button>
             {profiles.map((profile) => (
               <button
                 type="button"
                 key={profile.id}
-                className={`profile-choice-card ${profile.id === selectedProfileId ? 'is-active' : ''}`}
-                onClick={() => onSelect(profile.id)}
+                className={`profile-rail-item ${profile.id === selectedProfileId ? 'is-active' : ''}`}
+                onClick={() => {
+                  setIsCreating(false);
+                  setEditingProfile(profile);
+                  onSelect(profile.id);
+                }}
               >
                 <strong>{profile.name}</strong>
-                <span>{profile.is_default ? 'Default profile' : 'Saved lifestyle profile'}</span>
-                {profile.id === selectedProfileId && <Check size={18} aria-hidden="true" />}
+                <span>{profile.is_default ? 'Default' : 'Saved profile'}</span>
               </button>
             ))}
           </div>
-
-          <div className="profile-workspace-actions">
-            <button type="button" className="primary-button" onClick={() => setIsCreating(true)}>
+          <div className="profile-rail-actions">
+            <button
+              type="button"
+              onClick={() => {
+                setIsCreating(true);
+                setEditingProfile(null);
+                onSelect(null);
+              }}
+            >
               <Plus size={16} aria-hidden="true" />
-              New profile
+              New
             </button>
+            {selectedProfile && !selectedProfile.is_default && (
+              <button type="button" onClick={() => onSetDefault(selectedProfile.id)}>
+                <Star size={16} aria-hidden="true" />
+                Default
+              </button>
+            )}
             {selectedProfile && (
-              <>
-                <button type="button" onClick={() => setEditingProfile(selectedProfile)}>
-                  Edit selected
-                </button>
-                {!selectedProfile.is_default && (
-                  <button type="button" onClick={() => onSetDefault(selectedProfile.id)}>
-                    <Star size={16} aria-hidden="true" />
-                    Make default
-                  </button>
-                )}
-                <button type="button" className="icon-danger" onClick={() => onDelete(selectedProfile.id)}>
-                  <Trash2 size={16} aria-hidden="true" />
-                  Delete
-                </button>
-              </>
+              <button type="button" className="icon-danger" onClick={() => onDelete(selectedProfile.id)}>
+                <Trash2 size={16} aria-hidden="true" />
+                Delete
+              </button>
             )}
           </div>
-
-          {error && <p className="save-error">{error}</p>}
-
-          {formOpen && (
-            <form className="preference-profile-form workspace-form" onSubmit={submitForm}>
-              <ProfileFormFields form={form} setForm={setForm} toggleCategory={toggleCategory} />
-              <div className="profile-form-actions">
-                <button type="submit" className="primary-button" disabled={isSaving}>
-                  {isSaving ? 'Saving...' : editingProfile ? 'Update profile' : 'Create profile'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreating(false);
-                    setEditingProfile(null);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-
-        <aside className="profile-workspace-nav">
-          <p className="eyebrow">Neighborhood Analysis</p>
-          <span>Preference Profile</span>
-          <strong>{selectedProfile ? selectedProfile.name : 'Generic'}</strong>
-          <button type="button" onClick={onClose}>Return to map</button>
+          <button type="button" className="primary-button" onClick={onClose}>Return to map</button>
         </aside>
       </div>
     </section>

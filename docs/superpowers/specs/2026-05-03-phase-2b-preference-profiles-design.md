@@ -266,3 +266,36 @@ Frontend verification should cover:
 - The existing saved-neighborhood-report flow still works.
 - Phase 2B does not introduce accounts, cloud persistence, share URLs, compare mode, or commute routing.
 - `PLAN.md` can mark the preference-profile slice complete after implementation, leaving compare mode and provenance as the next Phase 2 work.
+
+## Stitch Parity And Dialog Visibility Addendum
+
+The current high-fidelity pass improved the palette but still misses the Stitch reference structure in important ways. The next repair pass must prioritize layout parity and overlay usability over additional decorative styling.
+
+### Problems To Correct
+
+- The Lifestyle Profile workspace currently behaves like an admin list first and an editor second. The Stitch reference shows the lifestyle editor as the primary visible content, with navigation/context in the right rail.
+- Several dialogs and controls can be partly hidden on shorter desktop viewports and mobile-sized screens because overlays do not consistently use viewport-safe heights and internal scrolling.
+- Overlay layering is ambiguous. The top rail, saved reports panel, profile workspace, and analysis panel need a deliberate z-index order so dialogs are never trapped behind other UI.
+- Some glyphs render as mojibake, such as `â—Ž`, which breaks the polished Stitch impression.
+- The saved reports panel should feel like the Stitch right-side report workspace rather than a generic stacked list.
+
+### Repair Direction
+
+Use a stricter Stitch clone direction for the visible surfaces:
+
+- Keep the map as the base layer.
+- Keep the top rail compact and glassy, but below modal workspaces.
+- Make the Lifestyle Profile workspace a centered modal with a fixed maximum height, internal scrolling, and a sticky action/footer area where needed.
+- Show the create/edit profile form immediately when the workspace opens. The selected profile or a blank new profile should be editable without first revealing a hidden form below the profile cards.
+- Move profile selection into a compact rail or strip. It should not displace the editor.
+- Match the Stitch profile editor fields: profile name and commute anchor row, rent slider, spatial priority chips, must-have and deal-breaker note boxes, and bottom Cancel/Save actions.
+- Make saved reports a right-side glass panel with compact thumbnail rows, small metadata, an open action, delete affordance, and a bottom primary action area.
+- Use predictable responsive behavior: on mobile, top rail stacks cleanly, profile workspace becomes a single-column sheet, and every panel can be scrolled without hiding footer actions.
+
+### Additional Acceptance Criteria
+
+- Opening Lifestyle Profile always shows usable profile controls and an editor within the viewport.
+- Opening Saved Reports always shows the close/refresh controls and report rows within the viewport.
+- The top rail never covers profile or saved-report dialog controls.
+- No user-visible mojibake glyphs remain in the redesigned frontend source.
+- Generic, create, edit, delete, default, analyze, save report, open report, and delete report flows remain functional after the visual repair.
