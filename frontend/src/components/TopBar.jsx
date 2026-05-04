@@ -1,6 +1,5 @@
 import { Archive, UserRound } from 'lucide-react';
 import SearchBar from './SearchBar.jsx';
-import { getActiveProfileLabel } from '../utils/preferenceProfiles.js';
 
 export default function TopBar({
   activeProfile,
@@ -13,8 +12,11 @@ export default function TopBar({
     <header className="top-bar">
       <div className="brand-lockup">VibeCheck</div>
       <button type="button" className="active-profile-button" onClick={onProfileClick}>
-        <UserRound size={16} aria-hidden="true" />
-        <span>{getActiveProfileLabel(activeProfile)}</span>
+        <UserRound size={15} aria-hidden="true" />
+        <span>
+          <small>Active Profile</small>
+          {activeProfile?.name || 'Generic'}
+        </span>
       </button>
       <div className="top-search">
         <SearchBar onSelect={onSelectPlace} />

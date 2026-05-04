@@ -1,6 +1,19 @@
 :root {
-  color: #17211b;
-  background: #e9eef0;
+  --vc-bg: #f8fafc;
+  --vc-surface: #ffffff;
+  --vc-glass: rgba(255, 255, 255, 0.84);
+  --vc-glass-strong: rgba(255, 255, 255, 0.94);
+  --vc-text: #0f172a;
+  --vc-muted: #64748b;
+  --vc-border: rgba(15, 23, 42, 0.12);
+  --vc-border-light: rgba(255, 255, 255, 0.75);
+  --vc-blue: #2563eb;
+  --vc-blue-soft: #eff6ff;
+  --vc-danger: #ba1a1a;
+  --vc-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  --vc-shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.14);
+  color: var(--vc-text);
+  background: var(--vc-bg);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -27,7 +40,7 @@ textarea {
 .map-stage {
   min-height: 100vh;
   position: relative;
-  background: #d8e4df;
+  background: #dce5e8;
 }
 
 .setup-panel {
@@ -44,10 +57,10 @@ textarea {
 
 .eyebrow {
   margin: 0 0 8px;
-  color: #3d6757;
-  font-size: 0.78rem;
+  color: var(--vc-muted);
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -61,8 +74,12 @@ textarea {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: #d8e4df;
-  color: #17211b;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(249, 115, 22, 0.7), transparent 28%),
+    radial-gradient(circle at 72% 30%, rgba(250, 204, 21, 0.42), transparent 30%),
+    radial-gradient(circle at 68% 76%, rgba(20, 184, 166, 0.5), transparent 36%),
+    linear-gradient(135deg, #f97316 0%, #f8fafc 46%, #0f766e 100%);
+  color: var(--vc-text);
   font-weight: 700;
 }
 
@@ -71,7 +88,7 @@ textarea {
   display: block;
   max-width: 360px;
   margin-top: 12px;
-  color: #476057;
+  color: var(--vc-muted);
   font-size: 0.9rem;
   font-weight: 500;
   text-align: center;
@@ -87,50 +104,68 @@ textarea {
 
 .top-bar {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 12px;
+  left: 10px;
+  right: 10px;
+  top: 10px;
   z-index: 4;
   display: grid;
-  grid-template-columns: auto auto minmax(260px, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: auto minmax(150px, auto) minmax(280px, 1fr) auto;
+  gap: 8px;
   align-items: center;
-  min-height: 48px;
-  padding: 7px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  min-height: 46px;
+  padding: 6px 8px;
+  border: 1px solid var(--vc-border-light);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  background: var(--vc-glass);
+  box-shadow: var(--vc-shadow);
   backdrop-filter: blur(10px);
 }
 
 .brand-lockup {
-  color: #0f172a;
+  color: var(--vc-text);
+  font-size: 0.86rem;
   font-weight: 800;
+  padding: 0 8px;
 }
 
 .active-profile-button,
 .top-icon-button {
   min-height: 34px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.8);
-  color: #0f172a;
+  background: transparent;
+  color: var(--vc-text);
   cursor: pointer;
 }
 
 .active-profile-button {
   display: inline-flex;
-  gap: 8px;
+  gap: 7px;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 10px;
   white-space: nowrap;
+}
+
+.active-profile-button span {
+  display: grid;
+  gap: 1px;
+  line-height: 1.05;
+  text-align: left;
+}
+
+.active-profile-button small {
+  color: var(--vc-muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .top-icon-button {
   display: grid;
   width: 34px;
   place-items: center;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .top-search .search-card {
@@ -141,15 +176,15 @@ textarea {
 .top-bar-error {
   grid-column: 1 / -1;
   margin: 0;
-  color: #8a3c32;
+  color: var(--vc-danger);
   font-size: 0.84rem;
 }
 
 .search-card {
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(25, 39, 32, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--vc-border);
   border-radius: 8px;
-  box-shadow: 0 18px 50px rgba(23, 33, 27, 0.16);
+  box-shadow: var(--vc-shadow);
   padding: 10px;
 }
 
@@ -165,6 +200,7 @@ textarea {
   min-height: 36px;
   width: 100%;
   background: transparent;
+  color: var(--vc-text);
 }
 
 .search-results {
@@ -176,8 +212,8 @@ textarea {
 .search-results button {
   border: 0;
   border-radius: 6px;
-  background: #f3f6f4;
-  color: #17211b;
+  background: var(--vc-blue-soft);
+  color: var(--vc-text);
   cursor: pointer;
   padding: 10px;
   text-align: left;
@@ -185,22 +221,23 @@ textarea {
 
 .search-error,
 .hint-line {
-  color: #6c342c;
+  color: var(--vc-danger);
   font-size: 0.88rem;
 }
 
 .analysis-panel {
   position: absolute;
-  right: 24px;
-  top: 24px;
-  bottom: 24px;
-  width: min(430px, calc(100vw - 48px));
+  right: 18px;
+  top: 84px;
+  bottom: 18px;
+  width: min(410px, calc(100vw - 36px));
   overflow: auto;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(25, 39, 32, 0.14);
-  border-radius: 8px;
+  background: var(--vc-glass-strong);
+  border: 1px solid var(--vc-border-light);
+  border-radius: 16px;
   padding: 18px;
-  box-shadow: 0 18px 50px rgba(23, 33, 27, 0.16);
+  box-shadow: var(--vc-shadow-lg);
+  backdrop-filter: blur(10px);
 }
 
 .selected-place-card,
@@ -211,8 +248,110 @@ textarea {
 .panel-error {
   border: 1px solid rgba(25, 39, 32, 0.12);
   border-radius: 8px;
-  background: #f8faf8;
+  background: #f8fafc;
   padding: 14px;
+}
+
+.landing-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 48px));
+  padding: 28px;
+  border: 1px solid var(--vc-border-light);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--vc-shadow-lg);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(10px);
+}
+
+.landing-card h1 {
+  margin: 0;
+  color: var(--vc-text);
+  font-size: 1rem;
+}
+
+.landing-card p {
+  margin: 0;
+  color: var(--vc-muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.landing-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--vc-blue-soft);
+  color: var(--vc-blue);
+  font-weight: 800;
+}
+
+.landing-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.landing-actions button {
+  min-height: 34px;
+  border: 1px solid var(--vc-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--vc-text);
+  cursor: pointer;
+  padding: 0 12px;
+}
+
+.landing-actions .primary-button {
+  background: var(--vc-blue);
+  color: #ffffff;
+}
+
+.map-status-chip {
+  position: absolute;
+  left: 22px;
+  bottom: 22px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--vc-border-light);
+  border-radius: 8px;
+  background: var(--vc-glass);
+  box-shadow: var(--vc-shadow);
+  color: var(--vc-text);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+
+.map-status-chip span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--vc-blue);
+}
+
+.map-status-chip strong {
+  color: var(--vc-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .selected-place-card {
@@ -225,14 +364,14 @@ textarea {
   display: grid;
   gap: 10px;
   margin-top: 16px;
-  background: #f7f9f8;
+  background: #f8fafc;
 }
 
 .preference-profiles {
   display: grid;
   gap: 10px;
   margin-bottom: 16px;
-  background: #f7f9f8;
+  background: #f8fafc;
 }
 
 .saved-profiles-header,
@@ -258,7 +397,7 @@ textarea {
   border: 1px solid rgba(25, 39, 32, 0.16);
   border-radius: 6px;
   background: #ffffff;
-  color: #17211b;
+  color: var(--vc-text);
   cursor: pointer;
   padding: 0 10px;
 }
@@ -300,7 +439,7 @@ textarea {
 }
 
 .icon-danger {
-  color: #8a3c32 !important;
+  color: var(--vc-danger) !important;
 }
 
 .profile-switcher-row,
@@ -531,7 +670,7 @@ textarea {
 }
 
 .primary-button {
-  background: #214d3f;
+  background: var(--vc-blue);
   color: white;
   font-weight: 700;
 }

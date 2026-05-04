@@ -83,6 +83,26 @@ export default function App() {
           onSavedReportsClick={() => setActiveWorkspace('savedReports')}
           onSelectPlace={handleSelectPlace}
         />
+        {!selectedPlace && !data && !loading && !error && (
+          <section className="landing-card">
+            <div className="landing-icon">◎</div>
+            <h1>Begin Your Analysis</h1>
+            <p>Select a profile and search a place to start your analysis.</p>
+            <div className="landing-actions">
+              <button type="button" className="primary-button" onClick={() => setActiveWorkspace('profiles')}>
+                Select Profile
+              </button>
+              <button type="button" onClick={() => setActiveWorkspace('savedReports')}>
+                Saved Reports
+              </button>
+            </div>
+          </section>
+        )}
+        <div className="map-status-chip">
+          <span></span>
+          Market saturation
+          <strong>{selectedPlace?.label || 'San Francisco, CA'}</strong>
+        </div>
         <PreferenceProfiles
           open={activeWorkspace === 'profiles'}
           profiles={preferenceProfiles}
@@ -107,7 +127,8 @@ export default function App() {
           }}
           onDelete={(profileId) => handleDeleteSavedProfile(profileId).catch(() => null)}
         />
-        <aside className="analysis-panel">
+        {(selectedPlace || data || loading || error) && (
+          <aside className="analysis-panel">
           {selectedPlace && (
             <div className="selected-place-card">
               <p className="eyebrow">Selected place</p>
@@ -146,7 +167,8 @@ export default function App() {
               onSave={() => saveCurrentProfile(data).catch(() => null)}
             />
           )}
-        </aside>
+          </aside>
+        )}
       </section>
     </main>
   );
