@@ -145,6 +145,34 @@ def test_cors_allows_local_vite_origin():
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
+def test_cors_allows_vite_fallback_origin():
+    client = TestClient(app)
+
+    response = client.options(
+        "/analyze",
+        headers={
+            "Origin": "http://127.0.0.1:5174",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5174"
+
+
+def test_cors_allows_profile_reads_from_vite_fallback_origin(monkeypatch):
+    _test_sqlite_path(monkeypatch)
+    client = TestClient(app)
+
+    response = client.get(
+        "/preference-profiles",
+        headers={"Origin": "http://127.0.0.1:5174"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5174"
+
+
 def test_cors_allows_preference_profile_update_from_local_vite():
     client = TestClient(app)
 

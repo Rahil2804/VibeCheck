@@ -94,6 +94,8 @@ Open:
 http://127.0.0.1:5173
 ```
 
+If Vite reports that 5173 is already in use, open the fallback URL it prints, such as `http://127.0.0.1:5174`.
+
 Health check:
 
 ```powershell

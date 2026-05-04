@@ -37,9 +37,12 @@ except Exception:
 
 app = FastAPI(title="VibeCheck API")
 
+LOCAL_VITE_ORIGIN_REGEX = r"^http://(localhost|127\.0\.0\.1):517[0-9]$"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origin_regex=LOCAL_VITE_ORIGIN_REGEX,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
