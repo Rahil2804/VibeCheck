@@ -553,6 +553,7 @@ textarea {
   display: grid;
   grid-template-columns: minmax(0, 700px) 290px;
   width: min(1010px, 100%);
+  height: min(760px, calc(100vh - 112px));
   max-height: calc(100vh - 112px);
   border: 1px solid var(--vc-border-light);
   border-radius: 16px;
@@ -565,8 +566,12 @@ textarea {
   display: grid;
   gap: 18px;
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 28px;
+  scrollbar-gutter: stable;
 }
 
 .workspace-title-row {
@@ -623,7 +628,7 @@ textarea {
 
 .profile-form-actions {
   position: sticky;
-  bottom: -28px;
+  bottom: 0;
   z-index: 1;
   display: flex;
   gap: 8px;
@@ -640,10 +645,14 @@ textarea {
   align-content: start;
   gap: 12px;
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px;
   background: rgba(248, 250, 252, 0.78);
   border-left: 1px solid rgba(15, 23, 42, 0.08);
+  scrollbar-gutter: stable;
 }
 
 .profile-workspace-nav span {
@@ -1135,11 +1144,14 @@ textarea {
 
   .profile-workspace {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: calc(100vh - 116px);
     max-height: calc(100vh - 116px);
-    overflow: auto;
+    overflow: hidden;
   }
 
   .profile-workspace-nav {
+    max-height: 34vh;
     border-left: 0;
     border-top: 1px solid rgba(15, 23, 42, 0.08);
   }

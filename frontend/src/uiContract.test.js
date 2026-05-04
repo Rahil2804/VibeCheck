@@ -30,5 +30,14 @@ test('workspace overlays sit above the top rail and use viewport-safe sizing', (
   assert.match(css, /\.top-bar\s*{[^}]*z-index:\s*var\(--layer-top-bar\)/s);
   assert.match(css, /\.workspace-backdrop\s*{[^}]*z-index:\s*var\(--layer-workspace\)/s);
   assert.match(css, /\.profile-workspace\s*{[^}]*max-height:\s*calc\(100vh - 112px\)/s);
-  assert.match(css, /\.profile-workspace-main\s*{[^}]*overflow:\s*auto/s);
+  assert.match(css, /\.profile-workspace-main\s*{[^}]*overflow-y:\s*auto/s);
+});
+
+test('profile workspace has a definite scrollable sheet height', () => {
+  const css = source('src/styles.css');
+
+  assert.match(css, /\.profile-workspace\s*{[^}]*height:\s*min\(760px,\s*calc\(100vh - 112px\)\)/s);
+  assert.match(css, /\.profile-workspace-main\s*{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /\.profile-workspace-nav\s*{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.profile-workspace\s*{[^}]*height:\s*calc\(100vh - 116px\)/s);
 });
