@@ -464,11 +464,18 @@ textarea {
 
 .profile-switcher-row select,
 .preference-profile-form input,
+.preference-profile-form select,
 .preference-profile-form textarea {
   width: 100%;
-  border: 1px solid rgba(25, 39, 32, 0.18);
-  border-radius: 6px;
+  border: 1px solid var(--vc-border);
+  border-radius: 8px;
+  background: #ffffff;
   padding: 10px 12px;
+}
+
+.preference-profile-form input[type="range"] {
+  accent-color: var(--vc-blue);
+  padding: 0;
 }
 
 .profile-switcher-row select {
@@ -487,12 +494,13 @@ textarea {
 }
 
 .category-checklist {
-  border: 1px solid rgba(25, 39, 32, 0.12);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
-  padding: 12px;
+  padding: 0;
 }
 
 .category-checklist legend {
@@ -504,6 +512,22 @@ textarea {
   display: flex;
   gap: 8px;
   align-items: center;
+  min-height: 40px;
+  border: 1px solid var(--vc-border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0 12px;
+  color: var(--vc-text);
+  font-size: 0.84rem;
+}
+
+.category-checklist input {
+  accent-color: var(--vc-blue);
+}
+
+.category-checklist label > span {
+  color: var(--vc-blue);
+  font-weight: 800;
 }
 
 .workspace-backdrop {
@@ -519,19 +543,19 @@ textarea {
 
 .profile-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 680px) 260px;
+  grid-template-columns: minmax(0, 680px) 290px;
   width: min(980px, 100%);
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--vc-border-light);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.14);
+  background: var(--vc-glass-strong);
+  box-shadow: var(--vc-shadow-lg);
   overflow: hidden;
 }
 
 .profile-workspace-main {
   display: grid;
   gap: 18px;
-  padding: 24px;
+  padding: 28px;
 }
 
 .workspace-title-row {
@@ -543,13 +567,13 @@ textarea {
 
 .workspace-title-row h1 {
   margin: 0 0 6px;
-  color: #0f172a;
+  color: var(--vc-text);
   font-size: 1.55rem;
 }
 
 .workspace-title-row p:last-child {
   margin: 0;
-  color: #45464d;
+  color: var(--vc-muted);
 }
 
 .profile-selection-grid {
@@ -563,10 +587,10 @@ textarea {
   grid-template-columns: 1fr auto;
   gap: 4px 10px;
   min-height: 82px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--vc-border);
   border-radius: 8px;
   background: #ffffff;
-  color: #0f172a;
+  color: var(--vc-text);
   cursor: pointer;
   padding: 12px;
   text-align: left;
@@ -574,7 +598,7 @@ textarea {
 
 .profile-choice-card span {
   grid-column: 1 / -1;
-  color: #45464d;
+  color: var(--vc-muted);
   font-size: 0.86rem;
 }
 
@@ -593,10 +617,10 @@ textarea {
 .profile-workspace-actions button,
 .profile-workspace-nav button {
   min-height: 36px;
-  border: 1px solid rgba(15, 23, 42, 0.14);
+  border: 1px solid var(--vc-border);
   border-radius: 8px;
   background: #ffffff;
-  color: #0f172a;
+  color: var(--vc-text);
   cursor: pointer;
   padding: 0 12px;
 }
@@ -605,7 +629,7 @@ textarea {
   display: inline-flex;
   gap: 8px;
   align-items: center;
-  background: #2563eb;
+  background: var(--vc-blue);
   color: #ffffff;
 }
 
@@ -616,8 +640,15 @@ textarea {
 .workspace-form .generic-toggle,
 .workspace-form .category-checklist,
 .workspace-form .profile-form-actions,
+.workspace-form .profile-form-section,
 .workspace-form .notes-field {
   grid-column: 1 / -1;
+}
+
+.preference-select-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .coordinate-grid {
@@ -631,12 +662,12 @@ textarea {
   align-content: start;
   gap: 12px;
   padding: 24px;
-  background: rgba(248, 250, 252, 0.96);
+  background: rgba(248, 250, 252, 0.78);
   border-left: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .profile-workspace-nav span {
-  color: #45464d;
+  color: var(--vc-muted);
   font-size: 0.9rem;
 }
 

@@ -7,14 +7,14 @@ import {
 } from '../utils/preferenceProfiles.js';
 
 const CATEGORY_OPTIONS = [
-  ['transit', 'Transit'],
-  ['walkability', 'Walkability'],
-  ['parks', 'Parks'],
-  ['groceries', 'Groceries'],
-  ['restaurants', 'Restaurants'],
-  ['quiet', 'Quiet'],
-  ['social_scene', 'Social scene'],
-  ['lower_rent_pressure', 'Lower rent pressure'],
+  ['transit', 'Transit', '▦'],
+  ['walkability', 'Walkability', '⇄'],
+  ['parks', 'Green spaces', '♧'],
+  ['groceries', 'Retail access', '□'],
+  ['restaurants', 'Dining', '◌'],
+  ['quiet', 'Quiet', '◒'],
+  ['social_scene', 'Nightlife', '✦'],
+  ['lower_rent_pressure', 'Rent pressure', '$'],
 ];
 
 const SELECT_OPTIONS = {
@@ -217,19 +217,21 @@ function ProfileFormFields({ form, setForm, toggleCategory }) {
         />
         Run this saved profile as generic
       </label>
-      {Object.entries(SELECT_OPTIONS).map(([field, options]) => (
-        <label className="field" key={field}>
-          <span>{field.replaceAll('_', ' ')}</span>
-          <select value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })}>
-            <option value="">No preference</option>
-            {options.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-      ))}
+      <div className="profile-form-section preference-select-grid">
+        {Object.entries(SELECT_OPTIONS).map(([field, options]) => (
+          <label className="field" key={field}>
+            <span>{field.replaceAll('_', ' ')}</span>
+            <select value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })}>
+              <option value="">No preference</option>
+              {options.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
       <label className="field">
         <span>Commute anchor</span>
         <input
@@ -266,6 +268,14 @@ function ProfileFormFields({ form, setForm, toggleCategory }) {
           value={form.max_monthly_rent}
           onChange={(event) => setForm({ ...form, max_monthly_rent: event.target.value })}
         />
+        <input
+          type="range"
+          min="0"
+          max="6000"
+          step="100"
+          value={form.max_monthly_rent || 0}
+          onChange={(event) => setForm({ ...form, max_monthly_rent: event.target.value })}
+        />
       </label>
       <CategoryChecklist
         title="Must haves"
@@ -293,9 +303,10 @@ function CategoryChecklist({ title, values, onToggle }) {
   return (
     <fieldset className="category-checklist">
       <legend>{title}</legend>
-      {CATEGORY_OPTIONS.map(([value, label]) => (
+      {CATEGORY_OPTIONS.map(([value, label, icon]) => (
         <label key={value}>
           <input type="checkbox" checked={values.includes(value)} onChange={() => onToggle(value)} />
+          <span>{icon}</span>
           {label}
         </label>
       ))}
