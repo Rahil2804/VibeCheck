@@ -408,8 +408,11 @@ textarea {
 }
 
 .saved-row {
-  border-top: 1px solid rgba(25, 39, 32, 0.09);
-  padding-top: 6px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border-top: 1px solid var(--vc-border);
+  padding-top: 10px;
 }
 
 .saved-row > button:first-child {
@@ -419,6 +422,14 @@ textarea {
   min-width: 0;
   min-height: 42px;
   text-align: left;
+}
+
+.saved-thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 44px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0f172a, #2563eb 50%, #94a3b8);
 }
 
 .saved-row strong,
@@ -730,6 +741,11 @@ textarea {
   margin-top: 18px;
 }
 
+.precision-panel {
+  gap: 14px;
+  margin-top: 0;
+}
+
 .profile-actions {
   align-items: flex-start;
 }
@@ -776,6 +792,27 @@ textarea {
   line-height: 1.45;
 }
 
+.vibe-overview {
+  display: grid;
+  gap: 8px;
+}
+
+.vibe-overview span,
+.trajectory-card span {
+  color: var(--vc-blue);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vibe-overview p {
+  margin: 0;
+  color: var(--vc-text);
+  font-size: 0.9rem;
+  line-height: 1.48;
+}
+
 .score-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -788,10 +825,73 @@ textarea {
 .trajectory-card,
 .context-card,
 .pros-cons-grid > div {
-  border: 1px solid rgba(25, 39, 32, 0.12);
-  border-radius: 8px;
-  background: #f8faf8;
+  border: 1px solid var(--vc-border);
+  border-radius: 10px;
+  background: #f8fafc;
   padding: 12px;
+}
+
+.fit-gauge-card {
+  display: grid;
+  gap: 12px;
+  place-items: center;
+  border: 0;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 18px;
+  text-align: center;
+}
+
+.fit-gauge-card p {
+  margin: 0;
+  color: var(--vc-muted);
+  font-size: 0.82rem;
+  line-height: 1.42;
+}
+
+.fit-gauge-card small {
+  color: var(--vc-danger);
+}
+
+.fit-gauge {
+  position: relative;
+  display: grid;
+  width: 116px;
+  height: 116px;
+  place-items: center;
+  border-radius: 999px;
+  background: conic-gradient(var(--vc-blue) var(--score), #dbeafe 0);
+}
+
+.fit-gauge::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: inherit;
+  background: #ffffff;
+}
+
+.fit-gauge strong,
+.fit-gauge span {
+  position: relative;
+  z-index: 1;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.fit-gauge strong {
+  align-self: center;
+  color: var(--vc-text);
+  font-size: 1.6rem;
+}
+
+.fit-gauge span {
+  align-self: end;
+  margin-bottom: 26px;
+  color: var(--vc-blue);
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .context-card h3 {
@@ -825,6 +925,9 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  border: 0;
+  border-radius: 10px;
+  background: #f8fafc;
 }
 
 .score-card strong,
@@ -878,6 +981,31 @@ textarea {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.insight-list {
+  display: grid;
+  gap: 8px;
+}
+
+.insight-list article {
+  border: 1px solid var(--vc-border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.insight-list h3 {
+  margin: 0 0 8px;
+  font-size: 0.86rem;
+}
+
+.insight-list ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--vc-muted);
+  font-size: 0.84rem;
+  line-height: 1.38;
 }
 
 .pros-cons-grid h3 {

@@ -6,10 +6,9 @@ export default function Profile({ response, activePreferenceProfile, onSave, sav
   const { profile, fit, confidence, source_statuses: statuses, synthesis } = response;
   const saveButtonText = isSaving ? 'Saving...' : savedProfileId ? 'Saved report' : 'Save report';
   return (
-    <section className="profile-stack">
+    <section className="profile-stack precision-panel">
       <div className="profile-actions">
         <div className="section-heading">
-          <p className="eyebrow">Neighborhood profile</p>
           <h2>{response.place.label}</h2>
           <p className="analysis-lens-line">
             {activePreferenceProfile ? `Analyzed for ${activePreferenceProfile.name}` : 'Generic neighborhood check'}
@@ -20,39 +19,49 @@ export default function Profile({ response, activePreferenceProfile, onSave, sav
         </button>
       </div>
       {saveError && <p className="save-error">{saveError}</p>}
-      <p className="overview">{profile.overview}</p>
+      {fit && <FitGauge fit={fit} />}
+      <article className="vibe-overview">
+        <span>Vibe Overview</span>
+        <p>{profile.overview}</p>
+      </article>
+      <ScoreCards scores={profile.vibe_scores} />
+      <div className="insight-list">
+        <article>
+          <h3>Pros</h3>
+          <ul>{profile.honest_pros.map((item) => <li key={item}>{item}</li>)}</ul>
+        </article>
+        <article>
+          <h3>Cons</h3>
+          <ul>{profile.honest_cons.map((item) => <li key={item}>{item}</li>)}</ul>
+        </article>
+      </div>
       {synthesis && (
         <article className={`synthesis-card synthesis-${synthesis.status}`}>
           <span>AI synthesis: {synthesis.status}</span>
           <p>{synthesis.message}</p>
         </article>
       )}
-      <ScoreCards scores={profile.vibe_scores} />
       <WhoLivesHere context={profile.who_lives_here} />
-      {fit && (
-        <article className="fit-card">
-          <span>{fit.label}</span>
-          <strong>{fit.score}</strong>
-          <p>{fit.explanation}</p>
-          {fit.flags?.map((flag) => <small key={flag}>{flag}</small>)}
-        </article>
-      )}
-      <div className="pros-cons-grid">
-        <div>
-          <h3>Pros</h3>
-          <ul>{profile.honest_pros.map((item) => <li key={item}>{item}</li>)}</ul>
-        </div>
-        <div>
-          <h3>Cons</h3>
-          <ul>{profile.honest_cons.map((item) => <li key={item}>{item}</li>)}</ul>
-        </div>
-      </div>
       <article className="trajectory-card">
         <span>{profile.trajectory.direction}</span>
         <p>{profile.trajectory.summary}</p>
       </article>
       <Confidence confidence={confidence} statuses={statuses} />
     </section>
+  );
+}
+
+function FitGauge({ fit }) {
+  const score = Math.max(0, Math.min(100, fit.score));
+  return (
+    <article className="fit-gauge-card">
+      <div className="fit-gauge" style={{ '--score': `${score * 3.6}deg` }}>
+        <strong>{score}%</strong>
+        <span>Fit Score</span>
+      </div>
+      <p>{fit.explanation}</p>
+      {fit.flags?.map((flag) => <small key={flag}>{flag}</small>)}
+    </article>
   );
 }
 

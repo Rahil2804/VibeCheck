@@ -19,6 +19,7 @@ export default function SavedProfiles({ open = true, profiles = [], onClose, onO
         <div className="saved-list">
           {profiles.map((profile) => (
             <div className="saved-row" key={profile.id}>
+              <div className="saved-thumb" aria-hidden="true"></div>
               <button type="button" onClick={() => onOpen(profile.id)}>
                 <strong>{profile.place_label}</strong>
                 <span>{profile.confidence_level} confidence</span>
