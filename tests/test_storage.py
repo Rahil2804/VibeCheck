@@ -8,6 +8,9 @@ from backend.models import (
     Place,
     PreferenceProfileCreate,
     PreferenceProfileUpdate,
+    ProfileProvenance,
+    ProvenanceItem,
+    ProvenanceSupport,
     SourceName,
     SourceStatus,
     SourceStatusCode,
@@ -57,6 +60,18 @@ def _response(label: str) -> AnalyzeResponse:
             trajectory=Trajectory(
                 direction=TrajectoryDirection.UNCERTAIN,
                 summary="Trajectory is uncertain.",
+            ),
+            provenance=ProfileProvenance(
+                items=[
+                    ProvenanceItem(
+                        claim_id="overview",
+                        label="Overview",
+                        summary="Overview is generated from available normalized access signals.",
+                        support=ProvenanceSupport.INFERRED,
+                        sources=[SourceName.ACCESS],
+                        source_fields=["access.walkability"],
+                    )
+                ]
             ),
         ),
         confidence=Confidence(
@@ -115,6 +130,20 @@ def test_get_saved_profile_returns_original_response():
     assert found is not None
     assert found.response.place.label == "Kensington Market"
     assert found.response.profile.overview == "Kensington Market overview."
+
+
+def test_saved_profile_preserves_provenance():
+    db_path = _db_path()
+    initialize_database(db_path)
+    saved = save_profile(_response("Source-backed Place"), db_path)
+
+    found = get_saved_profile(saved.id, db_path)
+
+    assert found is not None
+    provenance_items = found.response.profile.provenance.items
+    assert len(provenance_items) == 1
+    assert provenance_items[0].claim_id == "overview"
+    assert provenance_items[0].sources == [SourceName.ACCESS]
 
 
 def test_delete_saved_profile_removes_row():
