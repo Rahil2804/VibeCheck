@@ -1,4 +1,5 @@
 import Confidence from './Confidence.jsx';
+import Provenance from './Provenance.jsx';
 import ScoreCards from './ScoreCards.jsx';
 
 export default function Profile({ response, activePreferenceProfile, onSave, savedProfileId, saveError, isSaving }) {
@@ -46,6 +47,7 @@ export default function Profile({ response, activePreferenceProfile, onSave, sav
         <span>{profile.trajectory.direction}</span>
         <p>{profile.trajectory.summary}</p>
       </article>
+      <Provenance provenance={profile.provenance} />
       <Confidence confidence={confidence} statuses={statuses} />
     </section>
   );

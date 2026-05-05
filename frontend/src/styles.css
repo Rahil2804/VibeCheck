@@ -758,6 +758,72 @@ textarea {
   opacity: 0.72;
 }
 
+.provenance-section {
+  gap: 10px;
+}
+
+.provenance-list {
+  display: grid;
+  gap: 8px;
+}
+
+.provenance-row {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--vc-border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.provenance-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.provenance-row strong {
+  font-size: 0.88rem;
+}
+
+.provenance-row span {
+  color: var(--vc-blue);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.provenance-row p {
+  margin: 0;
+  color: var(--vc-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.provenance-unavailable {
+  background: #f8fafc;
+}
+
+.provenance-unavailable span {
+  color: var(--vc-muted);
+}
+
+.source-chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.source-chip-row small {
+  border-radius: 999px;
+  background: var(--vc-blue-soft);
+  color: var(--vc-blue);
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  text-transform: uppercase;
+}
+
 .generic-toggle {
   display: flex;
   gap: 8px;

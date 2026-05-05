@@ -41,3 +41,15 @@ test('profile workspace has a definite scrollable sheet height', () => {
   assert.match(css, /\.profile-workspace-nav\s*{[^}]*overflow-y:\s*auto/s);
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.profile-workspace\s*{[^}]*height:\s*calc\(100vh - 116px\)/s);
 });
+
+test('profile renders source support without raw payload output', () => {
+  const profile = source('src/components/Profile.jsx');
+  const provenance = source('src/components/Provenance.jsx');
+
+  assert.match(profile, /<Provenance provenance=\{profile\.provenance\} \/>/);
+  assert.match(provenance, /Source support/);
+  assert.match(provenance, /Supported/);
+  assert.match(provenance, /Inferred/);
+  assert.match(provenance, /Unavailable/);
+  assert.equal(provenance.includes('JSON.stringify'), false);
+});
