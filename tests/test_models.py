@@ -7,6 +7,9 @@ from backend.models import (
     Coordinates,
     PreferenceProfileCreate,
     PreferenceProfileUpdate,
+    ProfileProvenance,
+    ProvenanceItem,
+    ProvenanceSupport,
     SourceName,
     SourceStatus,
     SourceStatusCode,
@@ -99,3 +102,31 @@ def test_analyze_request_accepts_preference_profile_id():
     request = AnalyzeRequest(query="East Austin", preference_profile_id="profile-123")
 
     assert request.preference_profile_id == "profile-123"
+
+
+def test_profile_provenance_serializes_supported_claims():
+    provenance = ProfileProvenance(
+        items=[
+            ProvenanceItem(
+                claim_id="vibe.walkability",
+                label="Walkability score",
+                summary="Based on normalized access.walkability signal.",
+                support=ProvenanceSupport.INFERRED,
+                sources=[SourceName.ACCESS],
+                source_fields=["access.walkability"],
+            )
+        ]
+    )
+
+    assert provenance.model_dump(mode="json") == {
+        "items": [
+            {
+                "claim_id": "vibe.walkability",
+                "label": "Walkability score",
+                "summary": "Based on normalized access.walkability signal.",
+                "support": "inferred",
+                "sources": ["access"],
+                "source_fields": ["access.walkability"],
+            }
+        ]
+    }

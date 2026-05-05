@@ -1,5 +1,4 @@
 from enum import StrEnum
-from typing import Any
 from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
@@ -61,6 +60,12 @@ class SourceStatusCode(StrEnum):
     SUCCESS = "success"
     EMPTY = "empty"
     ERROR = "error"
+
+
+class ProvenanceSupport(StrEnum):
+    DIRECT = "direct"
+    INFERRED = "inferred"
+    UNAVAILABLE = "unavailable"
 
 
 class SynthesisStatusCode(StrEnum):
@@ -177,6 +182,19 @@ class SourceStatus(BaseModel):
     updated_at: str | None = None
 
 
+class ProvenanceItem(BaseModel):
+    claim_id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    support: ProvenanceSupport
+    sources: list[SourceName] = Field(default_factory=list)
+    source_fields: list[str] = Field(default_factory=list)
+
+
+class ProfileProvenance(BaseModel):
+    items: list[ProvenanceItem] = Field(default_factory=list)
+
+
 class SynthesisStatus(BaseModel):
     status: SynthesisStatusCode
     model: str | None = None
@@ -218,7 +236,7 @@ class NeighborhoodProfile(BaseModel):
     honest_pros: list[str]
     honest_cons: list[str]
     trajectory: Trajectory
-    provenance: dict[str, Any] = Field(default_factory=dict)
+    provenance: ProfileProvenance = Field(default_factory=ProfileProvenance)
 
 
 class FitScore(BaseModel):
