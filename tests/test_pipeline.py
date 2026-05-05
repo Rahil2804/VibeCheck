@@ -31,6 +31,10 @@ async def _slow_adapter():
     return {"value": 2}
 
 
+async def _returns_none(**_kwargs):
+    return None
+
+
 @pytest.mark.asyncio
 async def test_pipeline_keeps_partial_results_when_source_fails():
     response = await analyze_neighborhood(
@@ -198,3 +202,45 @@ async def test_pipeline_reports_synthesis_fallback_when_synthesizer_fails():
     assert "fallback" in response.synthesis.message.lower()
     assert "RuntimeError" in response.synthesis.message
     assert "model failed" in response.synthesis.message
+
+
+@pytest.mark.asyncio
+async def test_pipeline_attaches_provenance_to_deterministic_profile():
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="East Austin"),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.HOUSING: _success_adapter,
+            SourceName.REDDIT: _success_adapter,
+            SourceName.ACCESS: _success_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=_returns_none,
+    )
+
+    assert response.profile.provenance.items
+    claim_ids = {item.claim_id for item in response.profile.provenance.items}
+    assert "overview" in claim_ids
+    assert "vibe.walkability" in claim_ids
+
+
+@pytest.mark.asyncio
+async def test_pipeline_attaches_backend_provenance_to_synthesized_profile():
+    async def synthesizer(**_kwargs):
+        return _synthetic_profile()
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="East Austin"),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.HOUSING: _success_adapter,
+            SourceName.REDDIT: _success_adapter,
+            SourceName.ACCESS: _success_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=synthesizer,
+    )
+
+    assert response.synthesis.status == SynthesisStatusCode.USED
+    assert response.profile.provenance.items
+    assert any(item.claim_id == "overview" for item in response.profile.provenance.items)

@@ -122,7 +122,7 @@ async def test_synthesize_profile_uses_openai_safe_payload_schema(monkeypatch):
     assert captured["text_format"] is SynthesizedProfilePayload
     assert isinstance(profile, NeighborhoodProfile)
     assert profile.overview == "Synthesized overview."
-    assert profile.provenance == {}
+    assert profile.provenance.items == []
 
 
 @pytest.mark.asyncio

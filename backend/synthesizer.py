@@ -33,7 +33,7 @@ def parse_profile_payload(payload: dict[str, Any]) -> NeighborhoodProfile:
 
 
 def _to_neighborhood_profile(payload: SynthesizedProfilePayload) -> NeighborhoodProfile:
-    return NeighborhoodProfile(**payload.model_dump(), provenance={})
+    return NeighborhoodProfile(**payload.model_dump())
 
 
 async def synthesize_profile(

@@ -20,6 +20,7 @@ from backend.models import (
     VibeScores,
     WhoLivesHere,
 )
+from backend.provenance import build_profile_provenance
 from backend.scorer import score_fit
 from backend.sources.access import fetch_access_context
 from backend.sources.census import fetch_census_context
@@ -62,6 +63,7 @@ async def analyze_neighborhood(
     statuses = [place_status, *[status for status, _data in source_results]]
     source_data = {source: data for (status, data), source in zip(source_results, fetchers, strict=True)}
     confidence = build_confidence(statuses)
+    provenance = build_profile_provenance(source_data, statuses)
     fallback_profile = _build_profile(place, source_data)
     synthesizer = profile_synthesizer or synthesize_profile
     model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -96,6 +98,7 @@ async def analyze_neighborhood(
             )
     if profile is None:
         profile = fallback_profile
+    profile = profile.model_copy(update={"provenance": provenance})
     fit = None if request.generic_mode else score_fit(profile, request.preferences)
 
     return AnalyzeResponse(
