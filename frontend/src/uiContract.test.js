@@ -53,3 +53,15 @@ test('profile renders source support without raw payload output', () => {
   assert.match(provenance, /Unavailable/);
   assert.equal(provenance.includes('JSON.stringify'), false);
 });
+
+test('compare result components show summaries without raw payload output', () => {
+  const summary = source('src/components/CompareSummary.jsx');
+  const resultCard = source('src/components/CompareResultCard.jsx');
+
+  assert.match(summary, /Compare highlights/);
+  assert.match(summary, /buildCompareHighlights/);
+  assert.match(resultCard, /CompareResultCard/);
+  assert.match(resultCard, /<Confidence confidence=\{response\.confidence\} statuses=\{response\.source_statuses\} \/>/);
+  assert.match(resultCard, /<Provenance provenance=\{response\.profile\?\.provenance\} \/>/);
+  assert.equal(resultCard.includes('JSON.stringify'), false);
+});
