@@ -54,6 +54,19 @@ test('profile renders source support without raw payload output', () => {
   assert.equal(provenance.includes('JSON.stringify'), false);
 });
 
+test('profile renders freshness and source updated dates', () => {
+  const profile = source('src/components/Profile.jsx');
+  const freshness = source('src/components/Freshness.jsx');
+  const confidence = source('src/components/Confidence.jsx');
+
+  assert.match(profile, /<Freshness/);
+  assert.match(freshness, /Refresh report/);
+  assert.match(freshness, /Refresh analysis/);
+  assert.match(freshness, /formatGeneratedLabel/);
+  assert.match(confidence, /updated_at/);
+  assert.match(confidence, /formatSourceDate/);
+});
+
 test('compare result components show summaries without raw payload output', () => {
   const summary = source('src/components/CompareSummary.jsx');
   const resultCard = source('src/components/CompareResultCard.jsx');

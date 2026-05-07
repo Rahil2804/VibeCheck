@@ -16,11 +16,22 @@ export default function Confidence({ confidence, statuses }) {
       <div className="source-list">
         {statuses?.map((status) => (
           <div className={`source-row source-${status.status}`} key={status.source}>
-            <span>{status.source}</span>
+            <span>
+              {status.source}
+              {status.updated_at && <small>Updated {formatSourceDate(status.updated_at)}</small>}
+            </span>
             <strong>{status.status}</strong>
           </div>
         ))}
       </div>
     </section>
   );
+}
+
+function formatSourceDate(value) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(value));
 }

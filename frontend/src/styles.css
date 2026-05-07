@@ -1168,12 +1168,40 @@ textarea {
   gap: 6px;
 }
 
+.freshness-card {
+  gap: 10px;
+  border: 1px solid var(--vc-border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.freshness-card h2 {
+  font-size: 0.98rem;
+}
+
+.freshness-stale {
+  background: #fff8f5;
+  border-color: rgba(138, 60, 50, 0.2);
+}
+
 .source-row {
   display: flex;
   justify-content: space-between;
   border-bottom: 1px solid rgba(25, 39, 32, 0.1);
   padding: 6px 0;
   text-transform: capitalize;
+}
+
+.source-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.source-row small {
+  color: var(--vc-muted);
+  font-size: 0.72rem;
+  text-transform: none;
 }
 
 .source-success strong {

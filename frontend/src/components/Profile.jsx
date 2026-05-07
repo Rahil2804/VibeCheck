@@ -1,8 +1,20 @@
 import Confidence from './Confidence.jsx';
+import Freshness from './Freshness.jsx';
 import Provenance from './Provenance.jsx';
 import ScoreCards from './ScoreCards.jsx';
 
-export default function Profile({ response, activePreferenceProfile, onSave, savedProfileId, saveError, isSaving }) {
+export default function Profile({
+  response,
+  activePreferenceProfile,
+  onSave,
+  savedProfileId,
+  saveError,
+  isSaving,
+  generatedAt,
+  isRefreshing,
+  refreshError,
+  onRefresh,
+}) {
   if (!response) return null;
   const { profile, fit, confidence, source_statuses: statuses, synthesis } = response;
   const saveButtonText = isSaving ? 'Saving...' : savedProfileId ? 'Saved report' : 'Save report';
@@ -47,6 +59,13 @@ export default function Profile({ response, activePreferenceProfile, onSave, sav
         <span>{profile.trajectory.direction}</span>
         <p>{profile.trajectory.summary}</p>
       </article>
+      <Freshness
+        generatedAt={generatedAt}
+        savedProfileId={savedProfileId}
+        isRefreshing={isRefreshing}
+        refreshError={refreshError}
+        onRefresh={onRefresh}
+      />
       <Provenance provenance={profile.provenance} />
       <Confidence confidence={confidence} statuses={statuses} />
     </section>
