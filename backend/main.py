@@ -10,11 +10,13 @@ from backend.models import (
     PreferenceProfile,
     PreferenceProfileCreate,
     PreferenceProfileUpdate,
+    SaveProfileRequest,
     SavedProfile,
     SavedProfileSummary,
 )
 from backend.pipeline import analyze_neighborhood
 from backend.storage import (
+    build_refresh_request,
     create_preference_profile,
     delete_preference_profile,
     delete_saved_profile,
@@ -26,6 +28,7 @@ from backend.storage import (
     save_profile,
     set_default_preference_profile,
     update_preference_profile,
+    update_saved_profile,
 )
 
 load_environment()
@@ -115,13 +118,44 @@ async def default_preference_profile(profile_id: str) -> PreferenceProfile:
 
 
 @app.post("/profiles", response_model=SavedProfile)
-async def create_profile(response: AnalyzeResponse) -> SavedProfile:
-    return save_profile(response)
+async def create_profile(payload: SaveProfileRequest | AnalyzeResponse) -> SavedProfile:
+    if isinstance(payload, AnalyzeResponse):
+        return save_profile(payload)
+    return save_profile(payload.response, analyze_request=payload.analyze_request)
 
 
 @app.get("/profiles", response_model=list[SavedProfileSummary])
 async def profiles() -> list[SavedProfileSummary]:
     return list_saved_profiles()
+
+
+@app.post("/profiles/{profile_id}/refresh", response_model=SavedProfile)
+async def refresh_profile(profile_id: str) -> SavedProfile:
+    saved = get_saved_profile(profile_id)
+    if saved is None:
+        raise HTTPException(status_code=404, detail="Saved profile not found.")
+
+    request = build_refresh_request(saved)
+    if (
+        request.preference_profile_id is not None
+        and get_preference_profile(request.preference_profile_id) is None
+    ):
+        request = request.model_copy(update={"preference_profile_id": None})
+        if not any(
+            (
+                request.preferences.car_reliance,
+                request.preferences.energy_preference,
+                request.preferences.top_priority,
+                request.preferences.budget_sensitivity,
+            )
+        ):
+            request = request.model_copy(update={"generic_mode": True})
+
+    response = await analyze(request)
+    updated = update_saved_profile(profile_id, response, analyze_request=request)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Saved profile not found.")
+    return updated
 
 
 @app.get("/profiles/{profile_id}", response_model=SavedProfile)

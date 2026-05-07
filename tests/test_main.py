@@ -41,7 +41,13 @@ def test_profile_endpoints_save_list_read_and_delete(monkeypatch):
     analyze_response = client.post("/analyze", json={"query": "East Austin"})
     assert analyze_response.status_code == 200
 
-    save_response = client.post("/profiles", json=analyze_response.json())
+    save_response = client.post(
+        "/profiles",
+        json={
+            "response": analyze_response.json(),
+            "analyze_request": {"query": "East Austin"},
+        },
+    )
     assert save_response.status_code == 200
     saved = save_response.json()
     profile_id = saved["id"]
@@ -73,6 +79,45 @@ def test_delete_missing_profile_returns_404(monkeypatch):
     response = client.delete("/profiles/missing-id")
 
     assert response.status_code == 404
+
+
+def test_refresh_saved_profile_updates_existing_report(monkeypatch):
+    _test_sqlite_path(monkeypatch)
+    client = TestClient(app)
+    analyze_response = client.post(
+        "/analyze",
+        json={"query": "East Austin", "generic_mode": True},
+    )
+    assert analyze_response.status_code == 200
+    save_response = client.post(
+        "/profiles",
+        json={
+            "response": analyze_response.json(),
+            "analyze_request": {"query": "East Austin", "generic_mode": True},
+        },
+    )
+    assert save_response.status_code == 200
+    saved = save_response.json()
+
+    refresh_response = client.post(f"/profiles/{saved['id']}/refresh")
+
+    assert refresh_response.status_code == 200
+    refreshed = refresh_response.json()
+    assert refreshed["id"] == saved["id"]
+    assert refreshed["created_at"] == saved["created_at"]
+    assert refreshed["updated_at"] >= saved["updated_at"]
+    assert refreshed["response"]["place"]["label"] == "East Austin"
+    assert refreshed["analyze_request"]["generic_mode"] is True
+
+
+def test_refresh_missing_saved_profile_returns_404(monkeypatch):
+    _test_sqlite_path(monkeypatch)
+    client = TestClient(app)
+
+    response = client.post("/profiles/missing-id/refresh")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Saved profile not found."
 
 
 def test_preference_profile_endpoints_crud_and_default(monkeypatch):

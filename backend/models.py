@@ -262,6 +262,11 @@ class AnalyzeResponse(BaseModel):
     synthesis: SynthesisStatus
 
 
+class SaveProfileRequest(BaseModel):
+    response: AnalyzeResponse
+    analyze_request: AnalyzeRequest | None = None
+
+
 class SavedProfileSummary(BaseModel):
     id: str
     place_label: str
