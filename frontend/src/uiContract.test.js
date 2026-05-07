@@ -93,3 +93,13 @@ test('app exposes top-level compare mode without replacing profile management', 
   assert.match(app, /onCompareClick=\{\(\) => setActiveWorkspace\('compare'\)\}/);
   assert.match(app, /activeProfile=\{selectedPreferenceProfile\}/);
 });
+
+test('compare mode has viewport-safe responsive styling', () => {
+  const css = source('src/styles.css');
+
+  assert.match(css, /\.compare-workspace\s*{[^}]*position:\s*absolute/s);
+  assert.match(css, /\.compare-workspace\s*{[^}]*max-height:\s*calc\(100vh - 112px\)/s);
+  assert.match(css, /\.compare-results-grid\s*{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(260px,\s*1fr\)\)/s);
+  assert.match(css, /\.compare-place-slots\s*{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(220px,\s*1fr\)\)/s);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.compare-workspace\s*{[^}]*inset:\s*92px 12px 16px/s);
+});
