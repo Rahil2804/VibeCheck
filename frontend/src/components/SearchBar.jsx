@@ -1,16 +1,18 @@
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { MAPBOX_TOKEN, searchPlaces } from '../utils/mapbox.js';
+import { shouldSearchPlaces } from '../utils/searchState.js';
 
 export default function SearchBar({ onSelect }) {
   const [query, setQuery] = useState('');
+  const [selectedQuery, setSelectedQuery] = useState('');
   const [results, setResults] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let ignore = false;
     const timeout = setTimeout(async () => {
-      if (!query.trim()) {
+      if (!shouldSearchPlaces(query, selectedQuery)) {
         setResults([]);
         return;
       }
@@ -26,7 +28,7 @@ export default function SearchBar({ onSelect }) {
       ignore = true;
       clearTimeout(timeout);
     };
-  }, [query]);
+  }, [query, selectedQuery]);
 
   return (
     <div className="search-card">
@@ -47,8 +49,10 @@ export default function SearchBar({ onSelect }) {
               key={result.id}
               type="button"
               onClick={() => {
+                setSelectedQuery(result.label);
                 setQuery(result.label);
                 setResults([]);
+                setError('');
                 onSelect(result);
               }}
             >
