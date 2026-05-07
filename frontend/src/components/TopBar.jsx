@@ -1,4 +1,4 @@
-import { Archive, UserRound } from 'lucide-react';
+import { Archive, Scale, UserRound } from 'lucide-react';
 import SearchBar from './SearchBar.jsx';
 
 export default function TopBar({
@@ -6,6 +6,7 @@ export default function TopBar({
   preferenceProfileError,
   onProfileClick,
   onSavedReportsClick,
+  onCompareClick,
   onSelectPlace,
 }) {
   return (
@@ -21,6 +22,10 @@ export default function TopBar({
       <div className="top-search">
         <SearchBar onSelect={onSelectPlace} />
       </div>
+      <button type="button" className="compare-top-button" onClick={onCompareClick} aria-label="Compare places">
+        <Scale size={16} aria-hidden="true" />
+        <span>Compare</span>
+      </button>
       <button type="button" className="top-icon-button" onClick={onSavedReportsClick} aria-label="Saved reports">
         <Archive size={17} aria-hidden="true" />
       </button>

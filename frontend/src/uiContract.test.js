@@ -80,3 +80,16 @@ test('compare workspace supports ad hoc 2 to 4 place analysis', () => {
   assert.match(compareMode, /CompareSummary/);
   assert.match(compareSearch, /<SearchBar onSelect=\{onSelect\} \/>/);
 });
+
+test('app exposes top-level compare mode without replacing profile management', () => {
+  const app = source('src/App.jsx');
+  const topBar = source('src/components/TopBar.jsx');
+
+  assert.match(topBar, /onCompareClick/);
+  assert.match(topBar, /aria-label="Compare places"/);
+  assert.match(topBar, />Compare</);
+  assert.match(app, /import CompareMode from '\.\/components\/CompareMode\.jsx';/);
+  assert.match(app, /activeWorkspace === 'compare'/);
+  assert.match(app, /onCompareClick=\{\(\) => setActiveWorkspace\('compare'\)\}/);
+  assert.match(app, /activeProfile=\{selectedPreferenceProfile\}/);
+});

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import CompareMode from './components/CompareMode.jsx';
 import MapView from './components/MapView.jsx';
 import PreferenceProfiles from './components/PreferenceProfiles.jsx';
 import Profile from './components/Profile.jsx';
@@ -81,6 +82,7 @@ export default function App() {
           preferenceProfileError={preferenceProfileError}
           onProfileClick={() => setActiveWorkspace('profiles')}
           onSavedReportsClick={() => setActiveWorkspace('savedReports')}
+          onCompareClick={() => setActiveWorkspace('compare')}
           onSelectPlace={handleSelectPlace}
         />
         {!selectedPlace && !data && !loading && !error && (
@@ -127,6 +129,12 @@ export default function App() {
           }}
           onDelete={(profileId) => handleDeleteSavedProfile(profileId).catch(() => null)}
         />
+        {activeWorkspace === 'compare' && (
+          <CompareMode
+            activeProfile={selectedPreferenceProfile}
+            onClose={() => setActiveWorkspace(null)}
+          />
+        )}
         {(selectedPlace || data || loading || error) && (
           <aside className="analysis-panel">
           {selectedPlace && (
