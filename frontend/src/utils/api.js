@@ -9,6 +9,13 @@ export async function analyzeNeighborhood(payload) {
   return parseResponse(response, `Analyze failed with ${response.status}`);
 }
 
+export async function refreshSavedProfile(profileId) {
+  const response = await fetch(`${API_BASE_URL}/profiles/${profileId}/refresh`, {
+    method: 'POST',
+  });
+  return parseResponse(response, `Refresh saved profile failed with ${response.status}`);
+}
+
 export async function parseResponse(response, fallbackMessage) {
   if (response.ok) {
     return response.json();

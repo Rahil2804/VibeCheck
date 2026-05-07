@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
-import { analyzeNeighborhood } from './api.js';
+import { analyzeNeighborhood, refreshSavedProfile } from './api.js';
 
 const originalFetch = globalThis.fetch;
 
@@ -43,5 +43,26 @@ describe('analyzeNeighborhood', () => {
       () => analyzeNeighborhood({ preferences: {} }),
       /Provide either query or coordinates\./,
     );
+  });
+});
+
+describe('refreshSavedProfile', () => {
+  it('posts to the saved profile refresh endpoint', async () => {
+    const requests = [];
+    globalThis.fetch = async (url, options) => {
+      requests.push({ url, options });
+      return {
+        ok: true,
+        async json() {
+          return { id: 'saved-1', response: { place: { label: 'East Austin' } } };
+        },
+      };
+    };
+
+    const result = await refreshSavedProfile('saved-1');
+
+    assert.equal(result.id, 'saved-1');
+    assert.equal(requests[0].url, 'http://127.0.0.1:8000/profiles/saved-1/refresh');
+    assert.equal(requests[0].options.method, 'POST');
   });
 });
