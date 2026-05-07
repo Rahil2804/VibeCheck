@@ -570,10 +570,10 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 - [x] Add SQLite-backed local saved neighborhood reports with provider-compliant freshness rules.
 - [x] Add reusable SQLite-backed preference profiles that can be applied across neighborhood analyses.
 - [ ] Add public shareable profile URLs only if a hosted demo is later desired.
-- [ ] Add compare mode for two or more places.
-- [ ] Add provenance metadata to major generated claims.
+- [x] Add compare mode for two to four ad hoc places.
+- [x] Add provenance metadata to major generated claims.
 - [x] Add UI affordances for synthesis status and local saved-profile handling.
-- [ ] Add regression tests for cache freshness, compare response shape, and provenance display.
+- [ ] Add regression tests for cache freshness and future backend compare response shape.
 
 ### Phase 3 - Data Depth
 
