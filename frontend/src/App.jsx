@@ -17,10 +17,14 @@ export default function App() {
     error,
     loading,
     retry,
+    refreshCurrentProfile,
     savedProfiles,
     savedProfileId,
     saveError,
+    refreshError,
     isSaving,
+    isRefreshing,
+    generatedAt,
     preferenceProfiles,
     selectedPreferenceProfileId,
     setSelectedPreferenceProfileId,
@@ -172,6 +176,10 @@ export default function App() {
               savedProfileId={savedProfileId}
               saveError={saveError}
               isSaving={isSaving}
+              generatedAt={generatedAt}
+              isRefreshing={isRefreshing}
+              refreshError={refreshError}
+              onRefresh={refreshCurrentProfile}
               onSave={() => saveCurrentProfile(data).catch(() => null)}
             />
           )}

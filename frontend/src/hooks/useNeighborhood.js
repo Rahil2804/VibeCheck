@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { API_BASE_URL, analyzeNeighborhood, parseResponse } from '../utils/api.js';
+import { API_BASE_URL, analyzeNeighborhood, parseResponse, refreshSavedProfile } from '../utils/api.js';
 import { resolveSelectedPreferenceProfileId } from '../utils/preferenceProfiles.js';
 
 export function useNeighborhood() {
@@ -7,6 +7,9 @@ export function useNeighborhood() {
   const [error, setError] = useState('');
   const [savedProfiles, setSavedProfiles] = useState([]);
   const [saveError, setSaveError] = useState('');
+  const [refreshError, setRefreshError] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [generatedAt, setGeneratedAt] = useState(null);
   const [savedProfileId, setSavedProfileId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [preferenceProfiles, setPreferenceProfiles] = useState([]);
@@ -21,9 +24,10 @@ export function useNeighborhood() {
   const saveInFlightRef = useRef(false);
   const preferenceProfilesInitializedRef = useRef(false);
 
-  function setCurrentData(nextData) {
+  function setCurrentData(nextData, nextGeneratedAt = nextData ? new Date().toISOString() : null) {
     currentProfileRef.current = nextData;
     setData(nextData);
+    setGeneratedAt(nextGeneratedAt);
   }
 
   function invalidateAnalyzeRequest() {
@@ -42,6 +46,7 @@ export function useNeighborhood() {
     setLoading(true);
     setError('');
     setSaveError('');
+    setRefreshError('');
     setCurrentData(null);
     setSavedProfileId(null);
     setLastRequest(payload);
@@ -50,7 +55,8 @@ export function useNeighborhood() {
       if (analyzeRequestRef.current !== requestId) {
         return null;
       }
-      setCurrentData(body);
+      const timestamp = new Date().toISOString();
+      setCurrentData(body, timestamp);
       return body;
     } catch (err) {
       if (analyzeRequestRef.current === requestId) {
@@ -190,7 +196,10 @@ export function useNeighborhood() {
       const response = await fetch(`${API_BASE_URL}/profiles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profileData),
+        body: JSON.stringify({
+          response: profileData,
+          analyze_request: lastRequest,
+        }),
       });
       const body = await parseResponse(response, `Save profile failed with ${response.status}`);
       await loadSavedProfiles();
@@ -216,12 +225,13 @@ export function useNeighborhood() {
     invalidateAnalyzeRequest();
     setError('');
     setSaveError('');
+    setRefreshError('');
     const response = await fetch(`${API_BASE_URL}/profiles/${profileId}`);
     const body = await parseResponse(response, `Open saved profile failed with ${response.status}`);
     if (openRequestRef.current !== requestId) {
       return null;
     }
-    setCurrentData(body.response);
+    setCurrentData(body.response, body.updated_at);
     setSavedProfileId(body.id);
     return body;
   }
@@ -237,6 +247,7 @@ export function useNeighborhood() {
       setCurrentData(null);
       setSavedProfileId(null);
       setSaveError('');
+      setRefreshError('');
     }
     return body;
   }
@@ -247,7 +258,36 @@ export function useNeighborhood() {
     setCurrentData(null);
     setError('');
     setSaveError('');
+    setRefreshError('');
     setSavedProfileId(null);
+  }
+
+  async function refreshCurrentProfile() {
+    if (!data) return null;
+
+    setRefreshError('');
+    setIsRefreshing(true);
+    try {
+      if (savedProfileId) {
+        const refreshed = await refreshSavedProfile(savedProfileId);
+        await loadSavedProfiles();
+        setCurrentData(refreshed.response, refreshed.updated_at);
+        setSavedProfileId(refreshed.id);
+        return refreshed.response;
+      }
+      if (!lastRequest) {
+        throw new Error('No analysis request is available to refresh.');
+      }
+
+      const refreshed = await analyzeNeighborhood(lastRequest);
+      setCurrentData(refreshed, new Date().toISOString());
+      return refreshed;
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : 'Refresh failed');
+      return null;
+    } finally {
+      setIsRefreshing(false);
+    }
   }
 
   function retry() {
@@ -268,8 +308,11 @@ export function useNeighborhood() {
     preferenceProfileError,
     isSavingPreferenceProfile,
     saveError,
+    refreshError,
     savedProfileId,
     isSaving,
+    isRefreshing,
+    generatedAt,
     loadPreferenceProfiles,
     createPreferenceProfile,
     updatePreferenceProfile,
@@ -280,5 +323,6 @@ export function useNeighborhood() {
     openSavedProfile,
     deleteSavedProfile,
     clearCurrentProfile,
+    refreshCurrentProfile,
   };
 }

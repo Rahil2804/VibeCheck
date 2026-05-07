@@ -107,6 +107,19 @@ test('app exposes top-level compare mode without replacing profile management', 
   assert.match(app, /activeProfile=\{selectedPreferenceProfile\}/);
 });
 
+test('app wires saved and unsaved refresh into profile', () => {
+  const hook = source('src/hooks/useNeighborhood.js');
+  const app = source('src/App.jsx');
+
+  assert.match(hook, /refreshCurrentProfile/);
+  assert.match(hook, /refreshSavedProfile/);
+  assert.match(hook, /generatedAt/);
+  assert.match(hook, /refreshError/);
+  assert.match(app, /generatedAt=\{generatedAt\}/);
+  assert.match(app, /refreshError=\{refreshError\}/);
+  assert.match(app, /onRefresh=\{refreshCurrentProfile\}/);
+});
+
 test('compare mode has viewport-safe responsive styling', () => {
   const css = source('src/styles.css');
 
