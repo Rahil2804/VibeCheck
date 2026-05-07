@@ -270,6 +270,7 @@ class SavedProfileSummary(BaseModel):
     source_statuses: list[SourceStatus]
     created_at: str
     updated_at: str
+    analyze_request: AnalyzeRequest | None = None
 
 
 class SavedProfile(SavedProfileSummary):

@@ -2,6 +2,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from backend.models import (
+    AnalyzeRequest,
     AnalyzeResponse,
     Confidence,
     NeighborhoodProfile,
@@ -22,6 +23,7 @@ from backend.models import (
     WhoLivesHere,
 )
 from backend.storage import (
+    build_refresh_request,
     create_preference_profile,
     delete_preference_profile,
     delete_saved_profile,
@@ -33,6 +35,7 @@ from backend.storage import (
     save_profile,
     set_default_preference_profile,
     update_preference_profile,
+    update_saved_profile,
 )
 
 
@@ -154,6 +157,90 @@ def test_delete_saved_profile_removes_row():
     assert delete_saved_profile(saved.id, db_path) is True
     assert get_saved_profile(saved.id, db_path) is None
     assert delete_saved_profile(saved.id, db_path) is False
+
+
+def test_save_profile_persists_analyze_request_metadata():
+    db_path = _db_path()
+    initialize_database(db_path)
+    request = AnalyzeRequest(query="East Austin", generic_mode=True)
+
+    saved = save_profile(_response("East Austin"), db_path, analyze_request=request)
+    found = get_saved_profile(saved.id, db_path)
+
+    assert found is not None
+    assert found.analyze_request is not None
+    assert found.analyze_request.query == "East Austin"
+    assert found.analyze_request.generic_mode is True
+
+
+def test_existing_saved_profile_without_request_metadata_still_loads():
+    db_path = _db_path()
+    initialize_database(db_path)
+    saved = save_profile(_response("Legacy Place"), db_path)
+
+    found = get_saved_profile(saved.id, db_path)
+
+    assert found is not None
+    assert found.analyze_request is None
+    assert found.response.place.label == "Legacy Place"
+
+
+def test_update_saved_profile_overwrites_existing_row_and_updates_timestamp():
+    db_path = _db_path()
+    initialize_database(db_path)
+    saved = save_profile(
+        _response("Old Place"),
+        db_path,
+        analyze_request=AnalyzeRequest(query="Old Place"),
+    )
+
+    updated = update_saved_profile(
+        saved.id,
+        _response("New Place"),
+        db_path,
+        analyze_request=AnalyzeRequest(query="New Place", generic_mode=True),
+    )
+
+    assert updated is not None
+    assert updated.id == saved.id
+    assert updated.created_at == saved.created_at
+    assert updated.updated_at >= saved.updated_at
+    assert updated.place_label == "New Place"
+    assert updated.response.place.label == "New Place"
+    assert updated.analyze_request is not None
+    assert updated.analyze_request.query == "New Place"
+    assert len(list_saved_profiles(db_path)) == 1
+
+
+def test_build_refresh_request_uses_saved_request_when_available():
+    db_path = _db_path()
+    initialize_database(db_path)
+    saved = save_profile(
+        _response("Profile-backed Place"),
+        db_path,
+        analyze_request=AnalyzeRequest(
+            query="Profile-backed Place",
+            preference_profile_id="profile-1",
+        ),
+    )
+
+    request = build_refresh_request(saved)
+
+    assert request.query == "Profile-backed Place"
+    assert request.preference_profile_id == "profile-1"
+    assert request.generic_mode is False
+
+
+def test_build_refresh_request_falls_back_to_saved_place_as_generic():
+    db_path = _db_path()
+    initialize_database(db_path)
+    saved = save_profile(_response("Legacy Place"), db_path)
+
+    request = build_refresh_request(saved)
+
+    assert request.query == "Legacy Place"
+    assert request.generic_mode is True
+    assert request.preference_profile_id is None
 
 
 def test_create_preference_profile_persists_expanded_fields():

@@ -6,6 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from backend.models import (
+    AnalyzeRequest,
     AnalyzeResponse,
     CommuteAnchor,
     Coordinates,
@@ -36,11 +37,13 @@ def initialize_database(db_path: Path | None = None) -> None:
                 confidence_level TEXT NOT NULL,
                 source_statuses_json TEXT NOT NULL,
                 response_json TEXT NOT NULL,
+                analyze_request_json TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
             """
         )
+        _ensure_column(connection, "saved_profiles", "analyze_request_json", "TEXT")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS preference_profiles (
@@ -67,6 +70,7 @@ def initialize_database(db_path: Path | None = None) -> None:
 def save_profile(
     response: AnalyzeResponse,
     db_path: Path | None = None,
+    analyze_request: AnalyzeRequest | None = None,
 ) -> SavedProfile:
     path = db_path or get_database_path()
     initialize_database(path)
@@ -92,10 +96,11 @@ def save_profile(
                 confidence_level,
                 source_statuses_json,
                 response_json,
+                analyze_request_json,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 profile_id,
@@ -104,6 +109,7 @@ def save_profile(
                 response.confidence.level.value,
                 source_statuses_json,
                 response.model_dump_json(),
+                analyze_request.model_dump_json() if analyze_request is not None else None,
                 timestamp,
                 timestamp,
             ),
@@ -128,6 +134,7 @@ def list_saved_profiles(db_path: Path | None = None) -> list[SavedProfileSummary
                 coordinates_json,
                 confidence_level,
                 source_statuses_json,
+                analyze_request_json,
                 created_at,
                 updated_at
             FROM saved_profiles
@@ -155,6 +162,7 @@ def get_saved_profile(
                 confidence_level,
                 source_statuses_json,
                 response_json,
+                analyze_request_json,
                 created_at,
                 updated_at
             FROM saved_profiles
@@ -169,6 +177,69 @@ def get_saved_profile(
     return SavedProfile(
         **_summary_data(row),
         response=AnalyzeResponse.model_validate_json(row["response_json"]),
+    )
+
+
+def update_saved_profile(
+    profile_id: str,
+    response: AnalyzeResponse,
+    db_path: Path | None = None,
+    analyze_request: AnalyzeRequest | None = None,
+) -> SavedProfile | None:
+    path = db_path or get_database_path()
+    initialize_database(path)
+    current = get_saved_profile(profile_id, path)
+    if current is None:
+        return None
+
+    timestamp = _utc_timestamp()
+    coordinates_json = (
+        response.place.coordinates.model_dump_json()
+        if response.place.coordinates is not None
+        else None
+    )
+    source_statuses_json = json.dumps(
+        [status.model_dump(mode="json") for status in response.source_statuses]
+    )
+
+    with _connect(path) as connection:
+        connection.execute(
+            """
+            UPDATE saved_profiles
+            SET
+                place_label = ?,
+                coordinates_json = ?,
+                confidence_level = ?,
+                source_statuses_json = ?,
+                response_json = ?,
+                analyze_request_json = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                response.place.label,
+                coordinates_json,
+                response.confidence.level.value,
+                source_statuses_json,
+                response.model_dump_json(),
+                analyze_request.model_dump_json() if analyze_request is not None else None,
+                timestamp,
+                profile_id,
+            ),
+        )
+
+    return get_saved_profile(profile_id, path)
+
+
+def build_refresh_request(saved: SavedProfile) -> AnalyzeRequest:
+    if saved.analyze_request is not None:
+        return saved.analyze_request
+
+    place = saved.response.place
+    return AnalyzeRequest(
+        query=place.label,
+        coordinates=place.coordinates,
+        generic_mode=True,
     )
 
 
@@ -466,6 +537,22 @@ def _connect(path: Path) -> sqlite3.Connection:
     return connection
 
 
+def _ensure_column(
+    connection: sqlite3.Connection,
+    table_name: str,
+    column_name: str,
+    column_type: str,
+) -> None:
+    columns = {
+        row["name"]
+        for row in connection.execute(f"PRAGMA table_info({table_name})")
+    }
+    if column_name not in columns:
+        connection.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+        )
+
+
 def _utc_timestamp() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -491,4 +578,10 @@ def _summary_data(row: sqlite3.Row) -> dict[str, object]:
         ],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
+        "analyze_request": (
+            AnalyzeRequest.model_validate_json(row["analyze_request_json"])
+            if "analyze_request_json" in row.keys()
+            and row["analyze_request_json"] is not None
+            else None
+        ),
     }
