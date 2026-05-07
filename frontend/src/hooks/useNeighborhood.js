@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
+import { API_BASE_URL, analyzeNeighborhood, parseResponse } from '../utils/api.js';
 import { resolveSelectedPreferenceProfileId } from '../utils/preferenceProfiles.js';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export function useNeighborhood() {
   const [data, setData] = useState(null);
@@ -47,12 +46,7 @@ export function useNeighborhood() {
     setSavedProfileId(null);
     setLastRequest(payload);
     try {
-      const response = await fetch(`${API_BASE_URL}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const body = await parseResponse(response, `Analyze failed with ${response.status}`);
+      const body = await analyzeNeighborhood(payload);
       if (analyzeRequestRef.current !== requestId) {
         return null;
       }
@@ -287,19 +281,4 @@ export function useNeighborhood() {
     deleteSavedProfile,
     clearCurrentProfile,
   };
-}
-
-async function parseResponse(response, fallbackMessage) {
-  if (response.ok) {
-    return response.json();
-  }
-
-  let message = fallbackMessage;
-  try {
-    const body = await response.json();
-    message = body.detail || body.message || message;
-  } catch {
-    // Keep the status-based fallback when the server did not return JSON.
-  }
-  throw new Error(message);
 }
