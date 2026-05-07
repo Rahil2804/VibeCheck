@@ -65,3 +65,18 @@ test('compare result components show summaries without raw payload output', () =
   assert.match(resultCard, /<Provenance provenance=\{response\.profile\?\.provenance\} \/>/);
   assert.equal(resultCard.includes('JSON.stringify'), false);
 });
+
+test('compare workspace supports ad hoc 2 to 4 place analysis', () => {
+  const compareMode = source('src/components/CompareMode.jsx');
+  const compareSearch = source('src/components/ComparePlaceSearch.jsx');
+
+  assert.match(compareMode, /Compare places/);
+  assert.match(compareMode, /Analyze Compare/);
+  assert.match(compareMode, /MAX_COMPARE_SLOTS/);
+  assert.match(compareMode, /MIN_COMPARE_SLOTS/);
+  assert.match(compareMode, /analyzeNeighborhood/);
+  assert.match(compareMode, /Promise\.all/);
+  assert.match(compareMode, /CompareResultCard/);
+  assert.match(compareMode, /CompareSummary/);
+  assert.match(compareSearch, /<SearchBar onSelect=\{onSelect\} \/>/);
+});
