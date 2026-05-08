@@ -27,6 +27,7 @@ from backend.sources.access import fetch_access_context
 from backend.sources.census import fetch_census_context
 from backend.sources.common import SourceContext, SourceFetcher, SourceResult
 from backend.sources.housing import fetch_housing_context
+from backend.sources.local import fetch_local_context
 from backend.sources.mapbox import resolve_place
 from backend.sources.reddit import fetch_reddit_context
 from backend.synthesizer import synthesize_profile
@@ -40,6 +41,7 @@ DEFAULT_SOURCE_FETCHERS: dict[SourceName, SourceFetcher] = {
     SourceName.HOUSING: fetch_housing_context,
     SourceName.REDDIT: fetch_reddit_context,
     SourceName.ACCESS: fetch_access_context,
+    SourceName.LOCAL: fetch_local_context,
 }
 
 
