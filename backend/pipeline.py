@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 import os
 from collections.abc import Awaitable, Callable
@@ -24,12 +25,12 @@ from backend.provenance import build_profile_provenance
 from backend.scorer import score_fit
 from backend.sources.access import fetch_access_context
 from backend.sources.census import fetch_census_context
+from backend.sources.common import SourceContext, SourceFetcher, SourceResult
 from backend.sources.housing import fetch_housing_context
 from backend.sources.mapbox import resolve_place
 from backend.sources.reddit import fetch_reddit_context
 from backend.synthesizer import synthesize_profile
 
-SourceFetcher = Callable[[], Awaitable[dict[str, Any] | None]]
 ProfileSynthesizer = Callable[..., Awaitable[NeighborhoodProfile | None]]
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,12 @@ async def analyze_neighborhood(
     )
 
     fetchers = source_fetchers or DEFAULT_SOURCE_FETCHERS
+    context = SourceContext(request=request, place=place)
     source_results = await asyncio.gather(
-        *[_run_source(source, fetcher, timeout) for source, fetcher in fetchers.items()]
+        *[
+            _run_source(source, fetcher, timeout, context)
+            for source, fetcher in fetchers.items()
+        ]
     )
     statuses = [place_status, *[status for status, _data in source_results]]
     source_data = {source: data for (status, data), source in zip(source_results, fetchers, strict=True)}
@@ -115,9 +120,10 @@ async def _run_source(
     source: SourceName,
     fetcher: SourceFetcher,
     timeout: float,
+    context: SourceContext,
 ) -> tuple[SourceStatus, dict[str, Any]]:
     try:
-        data = await asyncio.wait_for(fetcher(), timeout=timeout)
+        result = await asyncio.wait_for(_call_source(fetcher, context), timeout=timeout)
     except TimeoutError:
         return (
             SourceStatus(
@@ -137,24 +143,55 @@ async def _run_source(
             {},
         )
 
-    if not data:
+    source_result = _coerce_source_result(result)
+    if not source_result.data:
         return (
             SourceStatus(
                 source=source,
                 status=SourceStatusCode.EMPTY,
-                message=f"{source.value} returned no usable MVP data.",
+                message=source_result.message
+                or f"{source.value} returned no usable MVP data.",
+                updated_at=source_result.updated_at,
             ),
             {},
         )
 
     return (
-        SourceStatus(
-            source=source,
-            status=SourceStatusCode.SUCCESS,
-            message=f"{source.value} data returned.",
-        ),
-        data,
+            SourceStatus(
+                source=source,
+                status=SourceStatusCode.SUCCESS,
+                message=source_result.message or f"{source.value} data returned.",
+                updated_at=source_result.updated_at,
+            ),
+        source_result.data,
     )
+
+
+async def _call_source(
+    fetcher: SourceFetcher,
+    context: SourceContext,
+) -> dict[str, Any] | SourceResult | None:
+    signature = inspect.signature(fetcher)
+    required_parameters = [
+        parameter
+        for parameter in signature.parameters.values()
+        if parameter.default is inspect.Parameter.empty
+        and parameter.kind
+        in {
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.KEYWORD_ONLY,
+        }
+    ]
+    if required_parameters:
+        return await fetcher(context)
+    return await fetcher()
+
+
+def _coerce_source_result(result: dict[str, Any] | SourceResult | None) -> SourceResult:
+    if isinstance(result, SourceResult):
+        return result
+    return SourceResult(data=result or {})
 
 
 def _build_profile(place: Place, source_data: dict[SourceName, dict[str, Any]]) -> NeighborhoodProfile:

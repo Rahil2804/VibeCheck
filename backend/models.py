@@ -54,6 +54,7 @@ class SourceName(StrEnum):
     HOUSING = "housing"
     REDDIT = "reddit"
     ACCESS = "access"
+    LOCAL = "local"
 
 
 class SourceStatusCode(StrEnum):

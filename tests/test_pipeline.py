@@ -16,6 +16,7 @@ from backend.models import (
     WhoLivesHere,
 )
 from backend.pipeline import analyze_neighborhood
+from backend.sources.common import SourceContext, SourceResult
 
 
 async def _success_adapter():
@@ -33,6 +34,58 @@ async def _slow_adapter():
 
 async def _returns_none(**_kwargs):
     return None
+
+
+@pytest.mark.asyncio
+async def test_pipeline_passes_resolved_place_to_context_aware_source():
+    seen_context: SourceContext | None = None
+
+    async def local_adapter(context: SourceContext):
+        nonlocal seen_context
+        seen_context = context
+        return {"coverage_area": context.place.label}
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="Toronto, ON"),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.HOUSING: _success_adapter,
+            SourceName.REDDIT: _success_adapter,
+            SourceName.ACCESS: _success_adapter,
+            SourceName.LOCAL: local_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=_returns_none,
+    )
+
+    assert seen_context is not None
+    assert seen_context.place.label == "Toronto, ON"
+    assert seen_context.request.query == "Toronto, ON"
+    assert any(status.source == SourceName.LOCAL for status in response.source_statuses)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_uses_source_result_message_and_updated_at():
+    async def local_adapter(_context: SourceContext):
+        return SourceResult(
+            data={},
+            message="No local open-data adapter is configured for this region.",
+            updated_at="2026-05-08T00:00:00+00:00",
+        )
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="Buffalo, NY"),
+        source_fetchers={SourceName.LOCAL: local_adapter},
+        source_timeout_seconds=1,
+        profile_synthesizer=_returns_none,
+    )
+
+    local_status = next(
+        status for status in response.source_statuses if status.source == SourceName.LOCAL
+    )
+    assert local_status.status == SourceStatusCode.EMPTY
+    assert local_status.message == "No local open-data adapter is configured for this region."
+    assert local_status.updated_at == "2026-05-08T00:00:00+00:00"
 
 
 @pytest.mark.asyncio
