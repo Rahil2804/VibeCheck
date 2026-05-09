@@ -216,6 +216,7 @@ class VibeScores(BaseModel):
     affordability: int = Field(ge=0, le=100)
     quiet: int = Field(ge=0, le=100)
     social_scene: int = Field(ge=0, le=100)
+    parks_outdoors: int | None = Field(default=None, ge=0, le=100)
 
 
 class WhoLivesHere(BaseModel):
