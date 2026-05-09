@@ -574,6 +574,7 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 - [x] Add provenance metadata to major generated claims.
 - [x] Add source freshness labels and single-place report refresh controls.
 - [x] Add Ontario-first local open-data source depth with Toronto development and parks/amenity signals.
+- [x] Add GTA/Ontario-first backend score depth from Toronto parks and amenity signals without redesigning the UI.
 - [x] Add UI affordances for synthesis status and local saved-profile handling.
 - [ ] Add regression tests for cache freshness and future backend compare response shape.
 
@@ -582,6 +583,7 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 - [ ] Add city open-data adapter interface.
 - [ ] Implement 2-3 cities deeply before adding more.
 - [ ] Add parks/open-space, grocery/pharmacy access, transit stop density, permits, and 311 signals where reliable.
+- [ ] Expand the Ontario/GTA municipal adapter set beyond Toronto after the local score bridge is stable.
 - [ ] Add city coverage matrix and UI.
 - [ ] Add source-specific contract tests using recorded/mock fixtures.
 
