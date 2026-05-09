@@ -15,6 +15,7 @@ The app opens on a Mapbox 3D map. A user searches for a US or Canadian address/p
 - Typed provenance metadata and Source support UI showing which normalized sources support major claims.
 - Dedicated compare mode for 2-4 ad hoc places using the active preference profile or Generic lens.
 - Source freshness labels and single-place refresh controls for current and saved reports.
+- Ontario-first local open-data source depth with Toronto development and parks/amenity signals.
 - Source status handling for Mapbox, Census, housing, Reddit, and access data.
 - Partial results when sources fail, time out, or return no MVP data.
 - Rule-based confidence and lifestyle fit scoring.
@@ -150,4 +151,4 @@ Backend tests intentionally blank live API keys at pytest startup so they do not
 
 ## Phase 2 Status
 
-Phase 2A added explicit local saved neighborhood reports. Phase 2B added reusable local preference profiles and then corrected the UI so profiles work as an app-level analysis lens selected before address search. Phase 2C adds typed provenance and compact source-support UI so major claims can be traced to normalized source signals. Phase 2D adds a dedicated compare mode for 2-4 ad hoc places using the active preference profile or Generic lens. Phase 2E adds source freshness labels and single-place refresh controls for current and saved reports. The next Phase 2 slices should focus on deeper city-specific adapters and share/export flows.
+Phase 2A added explicit local saved neighborhood reports. Phase 2B added reusable local preference profiles and then corrected the UI so profiles work as an app-level analysis lens selected before address search. Phase 2C adds typed provenance and compact source-support UI so major claims can be traced to normalized source signals. Phase 2D adds a dedicated compare mode for 2-4 ad hoc places using the active preference profile or Generic lens. Phase 2E adds source freshness labels and single-place refresh controls for current and saved reports. Phase 2F adds Ontario-first local open-data depth with Toronto development and parks/amenity signals, while unsupported Ontario municipalities degrade honestly. The next slices should focus on expanding Durham/Pickering coverage, preference scoring depth, and share/export flows.

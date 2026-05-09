@@ -573,6 +573,7 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 - [x] Add compare mode for two to four ad hoc places.
 - [x] Add provenance metadata to major generated claims.
 - [x] Add source freshness labels and single-place report refresh controls.
+- [x] Add Ontario-first local open-data source depth with Toronto development and parks/amenity signals.
 - [x] Add UI affordances for synthesis status and local saved-profile handling.
 - [ ] Add regression tests for cache freshness and future backend compare response shape.
 
