@@ -129,3 +129,13 @@ test('compare mode has viewport-safe responsive styling', () => {
   assert.match(css, /\.compare-place-slots\s*{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(220px,\s*1fr\)\)/s);
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.compare-workspace\s*{[^}]*inset:\s*92px 12px 16px/s);
 });
+
+test('local open data uses existing source and provenance UI', () => {
+  const confidence = source('src/components/Confidence.jsx');
+  const provenance = source('src/components/Provenance.jsx');
+  const profile = source('src/components/Profile.jsx');
+
+  assert.match(confidence, /statuses\?\.map/);
+  assert.match(provenance, /provenance\?\.items/);
+  assert.equal(profile.includes('LocalOpenData'), false);
+});

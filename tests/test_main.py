@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from backend.main import app
+from backend.sources.common import SourceResult
 
 
 def _test_sqlite_path(monkeypatch) -> Path:
@@ -269,3 +270,48 @@ def test_analyze_returns_404_for_missing_preference_profile(monkeypatch):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Preference profile not found."
+
+
+def test_analyze_includes_local_source_status_for_toronto_coordinates(monkeypatch):
+    _test_sqlite_path(monkeypatch)
+
+    async def fake_toronto_context(_context):
+        return SourceResult(
+            data={
+                "coverage_area": "Toronto",
+                "development_activity": 72,
+                "recent_permits_count": 4,
+                "major_project_count": 3,
+                "parks_count": 2,
+                "community_amenities_count": 1,
+                "parks_outdoors": 28,
+                "trajectory_signal": "rising",
+                "summary": "Toronto open data returned nearby development and parks/amenity signals.",
+                "updated_at": "2026-05-08T00:00:00+00:00",
+            },
+            message="Toronto open data returned development and parks signals.",
+            updated_at="2026-05-08T00:00:00+00:00",
+        )
+
+    monkeypatch.setattr(
+        "backend.sources.ontario.toronto.fetch_toronto_context",
+        fake_toronto_context,
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/analyze",
+        json={
+            "query": "Kensington Market, Toronto, ON",
+            "coordinates": {"lat": 43.654, "lng": -79.401},
+            "generic_mode": True,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    local_status = next(status for status in body["source_statuses"] if status["source"] == "local")
+    assert local_status["status"] == "success"
+    assert local_status["message"] == "Toronto open data returned development and parks signals."
+    assert local_status["updated_at"] == "2026-05-08T00:00:00+00:00"
+    assert body["profile"]["trajectory"]["direction"] == "rising"
