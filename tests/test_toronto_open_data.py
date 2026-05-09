@@ -116,6 +116,24 @@ def test_summarize_amenity_records_counts_parks_and_recreation_centres():
     assert summary["parks_outdoors"] == 16
 
 
+def test_summarize_amenity_records_handles_toronto_multipoint_geometry():
+    records = [
+        {
+            "geometry": {"type": "MultiPoint", "coordinates": [[-79.401, 43.654]]},
+            "properties": {
+                "ASSET_NAME": "Bellevue Square Park",
+                "TYPE": "Park",
+                "AMENITIES": "Playground",
+            },
+        }
+    ]
+
+    summary = summarize_amenity_records(records, CENTER, radius_km=1.5)
+
+    assert summary["parks_count"] == 1
+    assert summary["parks_outdoors"] == 12
+
+
 def test_normalize_toronto_open_data_combines_permits_and_amenities():
     permits = [
         {
@@ -148,6 +166,15 @@ def test_normalize_toronto_open_data_combines_permits_and_amenities():
     assert normalized["parks_count"] == 1
     assert normalized["updated_at"] == "2026-05-08T00:00:00+00:00"
     assert "Toronto open data" in normalized["summary"]
+
+
+def test_toronto_package_urls_use_live_ckan_api_host():
+    assert toronto.TORONTO_PERMITS_PACKAGE_URL.startswith(
+        "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
+    )
+    assert toronto.TORONTO_PARKS_PACKAGE_URL.startswith(
+        "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
+    )
 
 
 class FakeAsyncClient:
@@ -202,15 +229,6 @@ async def test_fetch_toronto_context_downloads_and_normalizes(monkeypatch):
                 }
             ),
             _response(
-                [
-                    {
-                        "LATITUDE": "43.6542",
-                        "LONGITUDE": "-79.4008",
-                        "PERMIT_TYPE": "New Building",
-                    }
-                ]
-            ),
-            _response(
                 {
                     "result": {
                         "resources": [
@@ -243,12 +261,13 @@ async def test_fetch_toronto_context_downloads_and_normalizes(monkeypatch):
     result = await fetch_toronto_context(_toronto_context())
 
     assert result.data["coverage_area"] == "Toronto"
-    assert result.data["recent_permits_count"] == 1
+    assert result.data["recent_permits_count"] == 0
     assert result.data["parks_count"] == 1
-    assert result.message == "Toronto open data returned development and parks signals."
+    assert result.message == (
+        "Toronto open data returned parks signals; local permit records need address-point matching before development scoring."
+    )
     assert client.urls == [
         toronto.TORONTO_PERMITS_PACKAGE_URL,
-        "https://example.test/permits.json",
         toronto.TORONTO_PARKS_PACKAGE_URL,
         "https://example.test/parks.geojson",
     ]
@@ -271,7 +290,6 @@ async def test_fetch_toronto_context_returns_empty_when_no_nearby_records(monkey
                     }
                 }
             ),
-            _response([]),
             _response(
                 {
                     "result": {

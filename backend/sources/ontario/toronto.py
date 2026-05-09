@@ -11,11 +11,11 @@ from backend.sources.common import SourceContext, SourceResult
 
 
 TORONTO_PERMITS_PACKAGE_URL = (
-    "https://open.toronto.ca/api/3/action/package_show"
+    "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
     "?id=building-permits-active-permits"
 )
 TORONTO_PARKS_PACKAGE_URL = (
-    "https://open.toronto.ca/api/3/action/package_show"
+    "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
     "?id=parks-and-recreation-facilities"
 )
 TORONTO_RADIUS_KM = 1.5
@@ -27,11 +27,8 @@ async def fetch_toronto_context(context: SourceContext) -> SourceResult:
         return SourceResult(data={}, message="Toronto local lookup needs resolved coordinates.")
 
     async with httpx.AsyncClient(timeout=8) as client:
-        permits_payload = await _download_package_resource(
-            client,
-            TORONTO_PERMITS_PACKAGE_URL,
-            preferred_formats=("JSON",),
-        )
+        permits_response = await client.get(TORONTO_PERMITS_PACKAGE_URL)
+        permits_response.raise_for_status()
         parks_payload = await _download_package_resource(
             client,
             TORONTO_PARKS_PACKAGE_URL,
@@ -39,11 +36,7 @@ async def fetch_toronto_context(context: SourceContext) -> SourceResult:
             preferred_name="4326.geojson",
         )
 
-    permit_records = (
-        permits_payload
-        if isinstance(permits_payload, list)
-        else permits_payload.get("records", [])
-    )
+    permit_records: list[dict[str, Any]] = []
     amenity_records = (
         parks_payload.get("features", []) if isinstance(parks_payload, dict) else []
     )
@@ -60,11 +53,8 @@ async def fetch_toronto_context(context: SourceContext) -> SourceResult:
             message="Toronto open data returned no nearby development or parks signals.",
             updated_at=updated_at,
         )
-    return SourceResult(
-        data=data,
-        message="Toronto open data returned development and parks signals.",
-        updated_at=updated_at,
-    )
+    message = _source_message(data)
+    return SourceResult(data=data, message=message, updated_at=updated_at)
 
 
 def normalize_toronto_open_data(
@@ -190,9 +180,10 @@ def _record_coordinates(record: dict[str, Any]) -> Coordinates | None:
     geometry = record.get("geometry")
     if isinstance(geometry, dict):
         raw = geometry.get("coordinates")
-        if isinstance(raw, list) and len(raw) >= 2:
-            lng = _to_float(raw[0])
-            lat = _to_float(raw[1])
+        pair = _coordinate_pair(raw)
+        if pair is not None:
+            lng = _to_float(pair[0])
+            lat = _to_float(pair[1])
             if lat is not None and lng is not None:
                 return Coordinates(lat=lat, lng=lng)
 
@@ -201,6 +192,20 @@ def _record_coordinates(record: dict[str, Any]) -> Coordinates | None:
     if lat is None or lng is None:
         return None
     return Coordinates(lat=lat, lng=lng)
+
+
+def _coordinate_pair(raw: Any) -> list[Any] | None:
+    if not isinstance(raw, list) or len(raw) == 0:
+        return None
+    if len(raw) < 2:
+        first = raw[0]
+        return first if isinstance(first, list) and len(first) >= 2 else None
+    if all(not isinstance(item, list) for item in raw[:2]):
+        return raw
+    first = raw[0]
+    if isinstance(first, list) and len(first) >= 2:
+        return first
+    return None
 
 
 def _first_float(record: dict[str, Any], keys: tuple[str, ...]) -> float | None:
@@ -236,8 +241,18 @@ def _record_text(record: dict[str, Any]) -> str:
 def _asset_name(record: dict[str, Any]) -> str:
     properties = record.get("properties")
     if isinstance(properties, dict):
-        return str(properties.get("AssetName") or properties.get("asset_name") or "")
-    return str(record.get("AssetName") or record.get("asset_name") or "")
+        return str(
+            properties.get("AssetName")
+            or properties.get("ASSET_NAME")
+            or properties.get("asset_name")
+            or ""
+        )
+    return str(
+        record.get("AssetName")
+        or record.get("ASSET_NAME")
+        or record.get("asset_name")
+        or ""
+    )
 
 
 def _distance_km(start: Coordinates, end: Coordinates) -> float:
@@ -264,3 +279,19 @@ def _has_meaningful_local_data(data: dict[str, Any]) -> bool:
             "community_amenities_count",
         )
     )
+
+
+def _source_message(data: dict[str, Any]) -> str:
+    permit_count = int(data.get("recent_permits_count", 0) or 0)
+    park_count = int(data.get("parks_count", 0) or 0)
+    amenity_count = int(data.get("community_amenities_count", 0) or 0)
+    if permit_count and (park_count or amenity_count):
+        return "Toronto open data returned development and parks signals."
+    if park_count or amenity_count:
+        return (
+            "Toronto open data returned parks signals; local permit records need "
+            "address-point matching before development scoring."
+        )
+    if permit_count:
+        return "Toronto open data returned development signals."
+    return "Toronto open data returned local signals."
