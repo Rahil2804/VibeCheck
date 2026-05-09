@@ -74,9 +74,15 @@ def score_fit(profile: NeighborhoodProfile, preferences: Preferences) -> FitScor
             score -= 12
             flags.append("Transit access is weak for your stated priority.")
     elif preferences.top_priority == TopPriority.PARKS_OUTDOORS:
-        if scores.quiet >= 60:
-            score += 10
-            reasons.append("outdoor and calmer-access signals are favorable")
+        if scores.parks_outdoors is not None and scores.parks_outdoors >= 75:
+            score += 12
+            reasons.append("parks and outdoor access are supported by local amenity signals")
+        elif scores.parks_outdoors is not None and scores.parks_outdoors >= 60:
+            score += 8
+            reasons.append("parks and outdoor access look favorable")
+        elif scores.parks_outdoors is not None and scores.parks_outdoors < 45:
+            score -= 8
+            flags.append("Parks and outdoor access look weak for your stated priority.")
     elif preferences.top_priority == TopPriority.RESTAURANTS_NIGHTLIFE:
         if scores.social_scene >= 70:
             score += 12

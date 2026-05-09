@@ -20,6 +20,7 @@ def _profile(**score_overrides) -> NeighborhoodProfile:
         "affordability": 50,
         "quiet": 50,
         "social_scene": 50,
+        "parks_outdoors": None,
     }
     scores.update(score_overrides)
     return NeighborhoodProfile(
@@ -92,6 +93,26 @@ def test_budget_sensitive_user_penalizes_low_affordability():
 
     assert fit.score < 45
     assert any("budget" in flag.lower() for flag in fit.flags)
+
+
+def test_parks_priority_rewards_supported_parks_outdoors_signal():
+    fit = score_fit(
+        _profile(quiet=45, parks_outdoors=82),
+        Preferences(top_priority=TopPriority.PARKS_OUTDOORS),
+    )
+
+    assert fit.score >= 62
+    assert "parks" in fit.explanation.lower()
+
+
+def test_parks_priority_no_longer_uses_quiet_as_proxy_when_parks_signal_is_missing():
+    fit = score_fit(
+        _profile(quiet=82, parks_outdoors=None),
+        Preferences(top_priority=TopPriority.PARKS_OUTDOORS),
+    )
+
+    assert fit.score == 50
+    assert "neutral" in fit.explanation.lower()
 
 
 def test_demographic_context_does_not_change_fit_score():
