@@ -2,7 +2,12 @@ import pytest
 
 from backend.models import AnalyzeRequest, Coordinates, Place
 from backend.sources.common import SourceContext
-from backend.sources.local import fetch_local_context, is_ontario_place, is_toronto_place
+from backend.sources.local import (
+    fetch_local_context,
+    is_gta_place,
+    is_ontario_place,
+    is_toronto_place,
+)
 
 
 def _context(place: Place) -> SourceContext:
@@ -43,7 +48,7 @@ async def test_local_source_returns_empty_for_unsupported_ontario_municipality()
     result = await fetch_local_context(_context(place))
 
     assert result.data == {}
-    assert result.message == "No local Ontario adapter is available yet for Pickering."
+    assert result.message == "No local GTA adapter is available yet for Pickering."
 
 
 @pytest.mark.asyncio
@@ -69,3 +74,23 @@ async def test_local_source_returns_empty_without_coordinates():
 
     assert result.data == {}
     assert result.message == "Local open-data lookup needs resolved coordinates."
+
+
+def test_detects_gta_municipalities_without_treating_them_as_toronto():
+    pickering = Place(
+        label="Pickering, Ontario, Canada",
+        city="Pickering",
+        state="Ontario",
+        coordinates=Coordinates(lat=43.8384, lng=-79.0868),
+    )
+    richmond_hill = Place(
+        label="Richmond Hill, Ontario, Canada",
+        city="Richmond Hill",
+        state="Ontario",
+        coordinates=Coordinates(lat=43.8828, lng=-79.4403),
+    )
+
+    assert is_gta_place(pickering) is True
+    assert is_gta_place(richmond_hill) is True
+    assert is_toronto_place(pickering) is False
+    assert is_toronto_place(richmond_hill) is False

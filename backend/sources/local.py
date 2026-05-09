@@ -1,6 +1,30 @@
 from backend.models import Place
 from backend.sources.common import SourceContext, SourceResult
 
+GTA_MUNICIPALITIES = {
+    "toronto",
+    "pickering",
+    "ajax",
+    "whitby",
+    "oshawa",
+    "clarington",
+    "uxbridge",
+    "scugog",
+    "brock",
+    "markham",
+    "vaughan",
+    "richmond hill",
+    "newmarket",
+    "aurora",
+    "mississauga",
+    "brampton",
+    "caledon",
+    "oakville",
+    "burlington",
+    "milton",
+    "halton hills",
+}
+
 
 async def fetch_local_context(context: SourceContext) -> SourceResult:
     place = context.place
@@ -17,9 +41,10 @@ async def fetch_local_context(context: SourceContext) -> SourceResult:
 
     if is_ontario_place(place):
         municipality = place.city or _first_label_part(place.label)
+        region = "GTA" if is_gta_place(place) else "Ontario"
         return SourceResult(
             data={},
-            message=f"No local Ontario adapter is available yet for {municipality}.",
+            message=f"No local {region} adapter is available yet for {municipality}.",
         )
 
     return SourceResult(
@@ -38,12 +63,22 @@ def is_toronto_place(place: Place) -> bool:
     return "toronto" in values
 
 
-def _place_tokens(place: Place) -> set[str]:
+def is_gta_place(place: Place) -> bool:
+    text = _place_text(place)
+    return any(municipality in text for municipality in GTA_MUNICIPALITIES)
+
+
+def _place_text(place: Place) -> str:
     raw_values = [place.label, place.city or "", place.state or ""]
+    return " ".join(raw_values).lower().replace(",", " ")
+
+
+def _place_tokens(place: Place) -> set[str]:
     tokens: set[str] = set()
-    for value in raw_values:
-        lowered = value.lower().replace(",", " ")
-        tokens.update(part.strip() for part in lowered.split() if part.strip())
+    for part in _place_text(place).split():
+        stripped = part.strip()
+        if stripped:
+            tokens.add(stripped)
     return tokens
 
 
