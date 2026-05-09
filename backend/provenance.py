@@ -8,6 +8,7 @@ from backend.models import (
     SourceStatus,
     SourceStatusCode,
 )
+from backend.score_signals import resolve_score_support
 
 
 def build_profile_provenance(
@@ -15,52 +16,48 @@ def build_profile_provenance(
     statuses: list[SourceStatus],
 ) -> ProfileProvenance:
     status_by_source = {status.source: status for status in statuses}
+    score_support = resolve_score_support(source_data)
     items = [
         _overview_item(source_data, status_by_source),
-        _field_item(
+        _score_item(
             claim_id="vibe.walkability",
             label="Walkability score",
-            source=SourceName.ACCESS,
-            source_field="walkability",
-            source_data=source_data,
+            score_key="walkability",
+            fallback_sources=[SourceName.ACCESS],
+            score_support=score_support,
             status_by_source=status_by_source,
-            support=ProvenanceSupport.INFERRED,
         ),
-        _field_item(
+        _score_item(
             claim_id="vibe.transit_access",
             label="Transit access score",
-            source=SourceName.ACCESS,
-            source_field="transit_access",
-            source_data=source_data,
+            score_key="transit_access",
+            fallback_sources=[SourceName.ACCESS],
+            score_support=score_support,
             status_by_source=status_by_source,
-            support=ProvenanceSupport.INFERRED,
         ),
-        _field_item(
+        _score_item(
             claim_id="vibe.affordability",
             label="Affordability score",
-            source=SourceName.HOUSING,
-            source_field="affordability",
-            source_data=source_data,
+            score_key="affordability",
+            fallback_sources=[SourceName.HOUSING],
+            score_support=score_support,
             status_by_source=status_by_source,
-            support=ProvenanceSupport.INFERRED,
         ),
-        _field_item(
+        _score_item(
             claim_id="vibe.quiet",
             label="Quiet score",
-            source=SourceName.REDDIT,
-            source_field="quiet",
-            source_data=source_data,
+            score_key="quiet",
+            fallback_sources=[SourceName.REDDIT],
+            score_support=score_support,
             status_by_source=status_by_source,
-            support=ProvenanceSupport.INFERRED,
         ),
-        _field_item(
+        _score_item(
             claim_id="vibe.social_scene",
             label="Social scene score",
-            source=SourceName.REDDIT,
-            source_field="social_scene",
-            source_data=source_data,
+            score_key="social_scene",
+            fallback_sources=[SourceName.REDDIT],
+            score_support=score_support,
             status_by_source=status_by_source,
-            support=ProvenanceSupport.INFERRED,
         ),
         _field_item(
             claim_id="context.median_age",
@@ -156,6 +153,49 @@ def _field_item(
         sources=[source],
         source_fields=[],
     )
+
+
+def _score_item(
+    *,
+    claim_id: str,
+    label: str,
+    score_key: str,
+    fallback_sources: list[SourceName],
+    score_support: dict[str, list[str]],
+    status_by_source: dict[SourceName, SourceStatus],
+) -> ProvenanceItem:
+    fields = score_support.get(score_key, [])
+    if fields:
+        return ProvenanceItem(
+            claim_id=claim_id,
+            label=label,
+            summary=f"Based on normalized {', '.join(fields)} signals.",
+            support=ProvenanceSupport.INFERRED,
+            sources=_sources_from_source_fields(fields),
+            source_fields=fields,
+        )
+
+    summaries = "; ".join(_status_summary(source, status_by_source) for source in fallback_sources)
+    return ProvenanceItem(
+        claim_id=claim_id,
+        label=label,
+        summary=f"{label} is unavailable because {summaries}.",
+        support=ProvenanceSupport.UNAVAILABLE,
+        sources=fallback_sources,
+        source_fields=[],
+    )
+
+
+def _sources_from_source_fields(fields: list[str]) -> list[SourceName]:
+    ordered_sources = [
+        SourceName.ACCESS,
+        SourceName.HOUSING,
+        SourceName.CENSUS,
+        SourceName.REDDIT,
+        SourceName.LOCAL,
+    ]
+    present = {field.split(".", maxsplit=1)[0] for field in fields}
+    return [source for source in ordered_sources if source.value in present]
 
 
 def _trajectory_item(

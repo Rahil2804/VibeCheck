@@ -89,3 +89,34 @@ def test_build_profile_provenance_marks_local_trajectory_and_amenities_supported
         "local.community_amenities_count",
         "local.parks_outdoors",
     ]
+
+
+def test_build_profile_provenance_cites_local_fields_for_scores_changed_by_local_bridge():
+    provenance = build_profile_provenance(
+        {
+            SourceName.LOCAL: {
+                "parks_outdoors": 88,
+                "parks_count": 5,
+                "community_amenities_count": 2,
+            }
+        },
+        [_status(SourceName.LOCAL, SourceStatusCode.SUCCESS)],
+    )
+
+    items = {item.claim_id: item for item in provenance.items}
+
+    assert items["vibe.walkability"].support == "inferred"
+    assert items["vibe.walkability"].sources == [SourceName.LOCAL]
+    assert items["vibe.walkability"].source_fields == [
+        "local.parks_outdoors",
+        "local.parks_count",
+        "local.community_amenities_count",
+    ]
+
+    assert items["vibe.quiet"].source_fields == [
+        "local.parks_outdoors",
+        "local.parks_count",
+    ]
+    assert items["vibe.social_scene"].source_fields == ["local.community_amenities_count"]
+    assert items["vibe.transit_access"].support == "unavailable"
+    assert items["vibe.affordability"].support == "unavailable"
