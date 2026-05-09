@@ -1,5 +1,12 @@
+import httpx
+import pytest
+
+from backend.models import AnalyzeRequest, Place
 from backend.models import Coordinates
+from backend.sources.common import SourceContext
+from backend.sources.ontario import toronto
 from backend.sources.ontario.toronto import (
+    fetch_toronto_context,
     normalize_toronto_open_data,
     summarize_amenity_records,
     summarize_permit_records,
@@ -141,3 +148,149 @@ def test_normalize_toronto_open_data_combines_permits_and_amenities():
     assert normalized["parks_count"] == 1
     assert normalized["updated_at"] == "2026-05-08T00:00:00+00:00"
     assert "Toronto open data" in normalized["summary"]
+
+
+class FakeAsyncClient:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.urls: list[str] = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    async def get(self, url):
+        self.urls.append(url)
+        return self.responses.pop(0)
+
+
+def _response(payload):
+    return httpx.Response(
+        200,
+        json=payload,
+        request=httpx.Request("GET", "https://example.test"),
+    )
+
+
+def _toronto_context() -> SourceContext:
+    place = Place(
+        label="Kensington Market, Toronto, ON",
+        city="Toronto",
+        state="ON",
+        coordinates=CENTER,
+    )
+    return SourceContext(request=AnalyzeRequest(query=place.label), place=place)
+
+
+@pytest.mark.asyncio
+async def test_fetch_toronto_context_downloads_and_normalizes(monkeypatch):
+    client = FakeAsyncClient(
+        [
+            _response(
+                {
+                    "result": {
+                        "resources": [
+                            {
+                                "name": "building-permits-active-permits.json",
+                                "format": "JSON",
+                                "url": "https://example.test/permits.json",
+                            }
+                        ]
+                    }
+                }
+            ),
+            _response(
+                [
+                    {
+                        "LATITUDE": "43.6542",
+                        "LONGITUDE": "-79.4008",
+                        "PERMIT_TYPE": "New Building",
+                    }
+                ]
+            ),
+            _response(
+                {
+                    "result": {
+                        "resources": [
+                            {
+                                "name": "Parks and Recreation Facilities - 4326.geojson",
+                                "format": "GeoJSON",
+                                "url": "https://example.test/parks.geojson",
+                            }
+                        ]
+                    }
+                }
+            ),
+            _response(
+                {
+                    "features": [
+                        {
+                            "geometry": {"coordinates": [-79.401, 43.654]},
+                            "properties": {
+                                "AssetName": "Bellevue Square Park",
+                                "Type": "Park",
+                            },
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+    monkeypatch.setattr(toronto.httpx, "AsyncClient", lambda **_kwargs: client)
+
+    result = await fetch_toronto_context(_toronto_context())
+
+    assert result.data["coverage_area"] == "Toronto"
+    assert result.data["recent_permits_count"] == 1
+    assert result.data["parks_count"] == 1
+    assert result.message == "Toronto open data returned development and parks signals."
+    assert client.urls == [
+        toronto.TORONTO_PERMITS_PACKAGE_URL,
+        "https://example.test/permits.json",
+        toronto.TORONTO_PARKS_PACKAGE_URL,
+        "https://example.test/parks.geojson",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_fetch_toronto_context_returns_empty_when_no_nearby_records(monkeypatch):
+    client = FakeAsyncClient(
+        [
+            _response(
+                {
+                    "result": {
+                        "resources": [
+                            {
+                                "name": "building-permits-active-permits.json",
+                                "format": "JSON",
+                                "url": "https://example.test/permits.json",
+                            }
+                        ]
+                    }
+                }
+            ),
+            _response([]),
+            _response(
+                {
+                    "result": {
+                        "resources": [
+                            {
+                                "name": "Parks and Recreation Facilities - 4326.geojson",
+                                "format": "GeoJSON",
+                                "url": "https://example.test/parks.geojson",
+                            }
+                        ]
+                    }
+                }
+            ),
+            _response({"features": []}),
+        ]
+    )
+    monkeypatch.setattr(toronto.httpx, "AsyncClient", lambda **_kwargs: client)
+
+    result = await fetch_toronto_context(_toronto_context())
+
+    assert result.data == {}
+    assert result.message == "Toronto open data returned no nearby development or parks signals."
