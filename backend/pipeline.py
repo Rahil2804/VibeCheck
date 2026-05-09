@@ -201,6 +201,7 @@ def _build_profile(place: Place, source_data: dict[SourceName, dict[str, Any]]) 
     housing = source_data.get(SourceName.HOUSING, {})
     census = source_data.get(SourceName.CENSUS, {})
     reddit = source_data.get(SourceName.REDDIT, {})
+    local = source_data.get(SourceName.LOCAL, {})
 
     scores = VibeScores(
         walkability=_score_from(access, "walkability", 50),
@@ -220,13 +221,65 @@ def _build_profile(place: Place, source_data: dict[SourceName, dict[str, Any]]) 
             population_density=census.get("population_density"),
             population_trend=census.get("population_trend"),
         ),
-        honest_pros=["Profile generated with partial source-aware data."],
-        honest_cons=["Some source adapters may be unavailable until API keys or open-data coverage are configured."],
-        trajectory=Trajectory(
-            direction=TrajectoryDirection.UNCERTAIN,
-            summary="Trajectory is uncertain until housing and local trend sources return data.",
-        ),
+        honest_pros=_build_honest_pros(local),
+        honest_cons=_build_honest_cons(local),
+        trajectory=_build_trajectory(local),
     )
+
+
+def _build_honest_pros(local: dict[str, Any]) -> list[str]:
+    pros = ["Profile generated with partial source-aware data."]
+    parks_count = _int_from(local, "parks_count")
+    amenities_count = _int_from(local, "community_amenities_count")
+    if parks_count or amenities_count:
+        pros.append(
+            f"Toronto local open data found {parks_count} nearby parks and "
+            f"{amenities_count} community amenity signals."
+        )
+    return pros
+
+
+def _build_honest_cons(local: dict[str, Any]) -> list[str]:
+    cons = [
+        "Some source adapters may be unavailable until API keys or open-data "
+        "coverage are configured."
+    ]
+    development_activity = _int_from(local, "development_activity")
+    if development_activity >= 50:
+        cons.append(
+            "Local permit signals suggest visible nearby development activity; "
+            "this can mean change and construction disruption, not guaranteed "
+            "affordability movement."
+        )
+    return cons
+
+
+def _build_trajectory(local: dict[str, Any]) -> Trajectory:
+    if local.get("trajectory_signal") == "rising":
+        return Trajectory(
+            direction=TrajectoryDirection.RISING,
+            summary=(
+                "Local open-data signals suggest visible development/change activity "
+                "nearby, based on active permit records."
+            ),
+        )
+    if local.get("trajectory_signal") == "stable":
+        return Trajectory(
+            direction=TrajectoryDirection.STABLE,
+            summary=(
+                "Local permit signals show some nearby activity, but not enough "
+                "to mark a strong change trajectory."
+            ),
+        )
+    return Trajectory(
+        direction=TrajectoryDirection.UNCERTAIN,
+        summary="Trajectory is uncertain until housing and local trend sources return data.",
+    )
+
+
+def _int_from(data: dict[str, Any], key: str) -> int:
+    raw = data.get(key, 0)
+    return raw if isinstance(raw, int) else 0
 
 
 def _score_from(data: dict[str, Any], key: str, default: int) -> int:

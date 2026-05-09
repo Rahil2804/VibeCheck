@@ -62,3 +62,30 @@ def test_build_profile_provenance_marks_missing_or_failed_sources_unavailable():
     assert items["vibe.affordability"].support == "unavailable"
     assert "housing source errored" in items["vibe.affordability"].summary.lower()
     assert items["overview"].support == "unavailable"
+
+
+def test_build_profile_provenance_marks_local_trajectory_and_amenities_supported():
+    provenance = build_profile_provenance(
+        {
+            SourceName.LOCAL: {
+                "development_activity": 72,
+                "recent_permits_count": 4,
+                "trajectory_signal": "rising",
+                "parks_count": 2,
+                "community_amenities_count": 1,
+                "parks_outdoors": 28,
+            }
+        },
+        [_status(SourceName.LOCAL, SourceStatusCode.SUCCESS)],
+    )
+
+    items = {item.claim_id: item for item in provenance.items}
+    assert items["overview"].sources == [SourceName.LOCAL]
+    assert items["trajectory"].sources == [SourceName.LOCAL]
+    assert "local.development_activity" in items["trajectory"].source_fields
+    assert items["local.amenities"].support == "inferred"
+    assert items["local.amenities"].source_fields == [
+        "local.parks_count",
+        "local.community_amenities_count",
+        "local.parks_outdoors",
+    ]

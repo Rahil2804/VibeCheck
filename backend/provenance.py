@@ -89,6 +89,7 @@ def build_profile_provenance(
             status_by_source=status_by_source,
             support=ProvenanceSupport.DIRECT,
         ),
+        _local_amenities_item(source_data, status_by_source),
         _trajectory_item(source_data, status_by_source),
     ]
     return ProfileProvenance(items=items)
@@ -98,7 +99,13 @@ def _overview_item(
     source_data: dict[SourceName, dict[str, Any]],
     status_by_source: dict[SourceName, SourceStatus],
 ) -> ProvenanceItem:
-    tracked_sources = (SourceName.ACCESS, SourceName.HOUSING, SourceName.CENSUS, SourceName.REDDIT)
+    tracked_sources = (
+        SourceName.ACCESS,
+        SourceName.HOUSING,
+        SourceName.CENSUS,
+        SourceName.REDDIT,
+        SourceName.LOCAL,
+    )
     available = [source for source in tracked_sources if _has_data(source_data, source)]
     if available:
         names = ", ".join(source.value for source in available)
@@ -156,6 +163,9 @@ def _trajectory_item(
     status_by_source: dict[SourceName, SourceStatus],
 ) -> ProvenanceItem:
     trend_fields = [
+        (SourceName.LOCAL, "development_activity"),
+        (SourceName.LOCAL, "recent_permits_count"),
+        (SourceName.LOCAL, "trajectory_signal"),
         (SourceName.HOUSING, "rent_trend"),
         (SourceName.REDDIT, "discussion_trend"),
     ]
@@ -168,7 +178,7 @@ def _trajectory_item(
         return ProvenanceItem(
             claim_id="trajectory",
             label="Trajectory",
-            summary="Trajectory is inferred from available trend signals.",
+            summary="Trajectory is inferred from available local and trend signals.",
             support=ProvenanceSupport.INFERRED,
             sources=_sources_for_fields(trend_fields, present_fields),
             source_fields=present_fields,
@@ -178,11 +188,44 @@ def _trajectory_item(
         label="Trajectory",
         summary=(
             "Trajectory is unavailable because trend fields are missing; "
+            f"{_status_summary(SourceName.LOCAL, status_by_source)}; "
             f"{_status_summary(SourceName.HOUSING, status_by_source)}; "
             f"{_status_summary(SourceName.REDDIT, status_by_source)}."
         ),
         support=ProvenanceSupport.UNAVAILABLE,
-        sources=[SourceName.HOUSING, SourceName.REDDIT],
+        sources=[SourceName.LOCAL, SourceName.HOUSING, SourceName.REDDIT],
+        source_fields=[],
+    )
+
+
+def _local_amenities_item(
+    source_data: dict[SourceName, dict[str, Any]],
+    status_by_source: dict[SourceName, SourceStatus],
+) -> ProvenanceItem:
+    fields = ["parks_count", "community_amenities_count", "parks_outdoors"]
+    present_fields = [
+        f"local.{field}"
+        for field in fields
+        if source_data.get(SourceName.LOCAL, {}).get(field) is not None
+    ]
+    if present_fields:
+        return ProvenanceItem(
+            claim_id="local.amenities",
+            label="Local parks and amenities",
+            summary="Local amenities are inferred from normalized municipal parks and facility signals.",
+            support=ProvenanceSupport.INFERRED,
+            sources=[SourceName.LOCAL],
+            source_fields=present_fields,
+        )
+    return ProvenanceItem(
+        claim_id="local.amenities",
+        label="Local parks and amenities",
+        summary=(
+            "Local amenities are unavailable because "
+            f"{_status_summary(SourceName.LOCAL, status_by_source)}."
+        ),
+        support=ProvenanceSupport.UNAVAILABLE,
+        sources=[SourceName.LOCAL],
         source_fields=[],
     )
 

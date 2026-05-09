@@ -297,3 +297,34 @@ async def test_pipeline_attaches_backend_provenance_to_synthesized_profile():
     assert response.synthesis.status == SynthesisStatusCode.USED
     assert response.profile.provenance.items
     assert any(item.claim_id == "overview" for item in response.profile.provenance.items)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_uses_local_data_for_deterministic_trajectory_and_pros():
+    async def local_adapter(_context: SourceContext):
+        return {
+            "coverage_area": "Toronto",
+            "development_activity": 72,
+            "recent_permits_count": 4,
+            "major_project_count": 3,
+            "parks_count": 2,
+            "community_amenities_count": 1,
+            "parks_outdoors": 28,
+            "trajectory_signal": "rising",
+            "summary": "Toronto open data returned nearby development and parks/amenity signals.",
+            "updated_at": "2026-05-08T00:00:00+00:00",
+        }
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="Kensington Market, Toronto, ON"),
+        source_fetchers={
+            SourceName.LOCAL: local_adapter,
+            SourceName.ACCESS: _success_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=_returns_none,
+    )
+
+    assert response.profile.trajectory.direction == TrajectoryDirection.RISING
+    assert "active permit records" in response.profile.trajectory.summary
+    assert any("parks" in item.lower() for item in response.profile.honest_pros)
