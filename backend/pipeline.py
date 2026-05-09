@@ -18,10 +18,10 @@ from backend.models import (
     SynthesisStatusCode,
     Trajectory,
     TrajectoryDirection,
-    VibeScores,
     WhoLivesHere,
 )
 from backend.provenance import build_profile_provenance
+from backend.score_signals import resolve_vibe_scores
 from backend.scorer import score_fit
 from backend.sources.access import fetch_access_context
 from backend.sources.census import fetch_census_context
@@ -197,19 +197,10 @@ def _coerce_source_result(result: dict[str, Any] | SourceResult | None) -> Sourc
 
 
 def _build_profile(place: Place, source_data: dict[SourceName, dict[str, Any]]) -> NeighborhoodProfile:
-    access = source_data.get(SourceName.ACCESS, {})
-    housing = source_data.get(SourceName.HOUSING, {})
     census = source_data.get(SourceName.CENSUS, {})
-    reddit = source_data.get(SourceName.REDDIT, {})
     local = source_data.get(SourceName.LOCAL, {})
 
-    scores = VibeScores(
-        walkability=_score_from(access, "walkability", 50),
-        transit_access=_score_from(access, "transit_access", 50),
-        affordability=_score_from(housing, "affordability", 50),
-        quiet=_score_from(reddit, "quiet", 50),
-        social_scene=_score_from(reddit, "social_scene", 50),
-    )
+    scores = resolve_vibe_scores(source_data)
     label = place.neighborhood or place.label
 
     return NeighborhoodProfile(
@@ -280,13 +271,6 @@ def _build_trajectory(local: dict[str, Any]) -> Trajectory:
 def _int_from(data: dict[str, Any], key: str) -> int:
     raw = data.get(key, 0)
     return raw if isinstance(raw, int) else 0
-
-
-def _score_from(data: dict[str, Any], key: str, default: int) -> int:
-    raw = data.get(key, default)
-    if not isinstance(raw, int | float):
-        return default
-    return max(0, min(100, int(raw)))
 
 
 def _safe_exception_message(exc: Exception) -> str:

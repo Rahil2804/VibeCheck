@@ -328,3 +328,32 @@ async def test_pipeline_uses_local_data_for_deterministic_trajectory_and_pros():
     assert response.profile.trajectory.direction == TrajectoryDirection.RISING
     assert "active permit records" in response.profile.trajectory.summary
     assert any("parks" in item.lower() for item in response.profile.honest_pros)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_bridges_local_parks_into_visible_scores():
+    async def local_adapter(_context: SourceContext):
+        return {
+            "coverage_area": "Toronto",
+            "parks_count": 5,
+            "community_amenities_count": 2,
+            "parks_outdoors": 88,
+            "trajectory_signal": "uncertain",
+            "summary": "Toronto open data returned nearby parks/amenity signals.",
+            "updated_at": "2026-05-08T00:00:00+00:00",
+        }
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="Kensington Market, Toronto, ON"),
+        source_fetchers={SourceName.LOCAL: local_adapter},
+        source_timeout_seconds=1,
+        profile_synthesizer=_returns_none,
+    )
+
+    scores = response.profile.vibe_scores
+    assert scores.walkability == 69
+    assert scores.quiet == 59
+    assert scores.social_scene == 58
+    assert scores.parks_outdoors == 88
+    assert scores.transit_access == 50
+    assert scores.affordability == 50
