@@ -1,5 +1,13 @@
+from datetime import UTC, datetime
 from typing import Any
 
+import httpx
+
+from backend.sources.common import SourceContext, SourceResult
+
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+ACCESS_RADIUS_METERS = 1200
+OVERPASS_TIMEOUT_SECONDS = 6
 LOW_SCORE = 30
 
 CATEGORY_KEYS = (
@@ -15,20 +23,52 @@ CATEGORY_KEYS = (
 )
 
 
-async def fetch_access_context() -> dict[str, Any]:
-    return {
-        "walkability": 50,
-        "transit_access": 50,
-        "daily_needs": 50,
-        "food_social": 50,
-        "parks_outdoors": 50,
-        "nearby_categories": {
-            "groceries": 0,
-            "parks": 0,
-            "restaurants": 0,
-            "transit": 0,
-        },
-    }
+async def fetch_access_context(
+    context: SourceContext,
+    client: httpx.AsyncClient | None = None,
+) -> SourceResult:
+    coordinates = context.place.coordinates
+    if coordinates is None:
+        return SourceResult(data={}, message="Access lookup needs resolved coordinates.")
+
+    query = build_overpass_query(lat=coordinates.lat, lng=coordinates.lng)
+    should_close = client is None
+    http_client = client or httpx.AsyncClient(timeout=OVERPASS_TIMEOUT_SECONDS + 2)
+    try:
+        response = await http_client.post(OVERPASS_URL, data={"data": query})
+        response.raise_for_status()
+        data = normalize_access_payload(response.json())
+    finally:
+        if should_close:
+            await http_client.aclose()
+
+    checked_at = datetime.now(UTC).replace(microsecond=0).isoformat()
+    return SourceResult(
+        data=data,
+        message=data["summary"],
+        updated_at=checked_at,
+    )
+
+
+def build_overpass_query(*, lat: float, lng: float) -> str:
+    around = f"around:{ACCESS_RADIUS_METERS},{lat},{lng}"
+    return f"""
+[out:json][timeout:{OVERPASS_TIMEOUT_SECONDS}];
+(
+  node({around})[shop~"^(supermarket|convenience|grocery)$"];
+  way({around})[shop~"^(supermarket|convenience|grocery)$"];
+  node({around})[amenity~"^(pharmacy|library|restaurant|cafe|bar|pub|fast_food|community_centre|townhall|clinic|doctors)$"];
+  way({around})[amenity~"^(pharmacy|library|restaurant|cafe|bar|pub|fast_food|community_centre|townhall|clinic|doctors)$"];
+  node({around})[highway="bus_stop"];
+  node({around})[public_transport~"^(platform|station)$"];
+  node({around})[railway~"^(station|subway_entrance|tram_stop)$"];
+  way({around})[leisure~"^(park|garden|playground|recreation_ground)$"];
+  relation({around})[leisure~"^(park|garden|playground|recreation_ground)$"];
+  way({around})[landuse="recreation_ground"];
+  relation({around})[landuse="recreation_ground"];
+);
+out center tags;
+""".strip()
 
 
 def normalize_access_payload(payload: dict[str, Any]) -> dict[str, Any]:
