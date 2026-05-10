@@ -1,20 +1,105 @@
 import pytest
 
-from backend.sources.access import fetch_access_context
+from backend.sources.access import normalize_access_payload
 
 
-@pytest.mark.asyncio
-async def test_fetch_access_context_returns_conservative_normalized_signals():
-    context = await fetch_access_context()
-
-    assert context["walkability"] == 50
-    assert context["transit_access"] == 50
-    assert context["daily_needs"] == 50
-    assert context["food_social"] == 50
-    assert context["parks_outdoors"] == 50
-    assert context["nearby_categories"] == {
-        "groceries": 0,
-        "parks": 0,
-        "restaurants": 0,
-        "transit": 0,
+def _element(element_id: int, tags: dict[str, str], element_type: str = "node") -> dict:
+    return {
+        "type": element_type,
+        "id": element_id,
+        "lat": 43.654,
+        "lon": -79.401,
+        "tags": tags,
     }
+
+
+def test_normalize_access_payload_counts_supported_categories_and_scores_dense_area():
+    payload = {
+        "elements": [
+            _element(1, {"shop": "supermarket"}),
+            _element(2, {"shop": "convenience"}),
+            _element(3, {"amenity": "pharmacy"}),
+            _element(4, {"amenity": "library"}),
+            _element(5, {"amenity": "restaurant"}),
+            _element(6, {"amenity": "restaurant"}),
+            _element(7, {"amenity": "cafe"}),
+            _element(8, {"amenity": "bar"}),
+            _element(9, {"highway": "bus_stop"}),
+            _element(10, {"public_transport": "station"}),
+            _element(11, {"railway": "subway_entrance"}),
+            _element(12, {"leisure": "park"}, element_type="way"),
+            _element(13, {"leisure": "playground"}, element_type="relation"),
+            _element(14, {"amenity": "community_centre"}),
+        ]
+    }
+
+    access = normalize_access_payload(payload)
+
+    assert access["nearby_categories"] == {
+        "groceries": 2,
+        "pharmacies": 1,
+        "restaurants": 2,
+        "cafes": 1,
+        "bars": 1,
+        "transit": 3,
+        "parks": 2,
+        "libraries": 1,
+        "community": 1,
+    }
+    assert access["daily_needs"] >= 70
+    assert access["food_social"] >= 65
+    assert access["transit_access"] >= 60
+    assert access["parks_outdoors"] >= 60
+    assert access["walkability"] >= 70
+    assert "public POI signals" in access["summary"]
+
+
+def test_normalize_access_payload_dedupes_same_osm_element():
+    payload = {
+        "elements": [
+            _element(1, {"amenity": "restaurant"}),
+            _element(1, {"amenity": "restaurant"}),
+            _element(2, {"amenity": "restaurant"}),
+        ]
+    }
+
+    access = normalize_access_payload(payload)
+
+    assert access["nearby_categories"]["restaurants"] == 2
+    assert access["food_social"] > 50
+
+
+def test_normalize_access_payload_accepts_way_center_and_ignores_unknown_tags():
+    payload = {
+        "elements": [
+            {
+                "type": "way",
+                "id": 20,
+                "center": {"lat": 43.65, "lon": -79.4},
+                "tags": {"landuse": "recreation_ground"},
+            },
+            _element(21, {"shop": "clothes"}),
+        ]
+    }
+
+    access = normalize_access_payload(payload)
+
+    assert access["nearby_categories"]["parks"] == 1
+    assert access["nearby_categories"]["groceries"] == 0
+
+
+def test_normalize_access_payload_returns_low_scores_for_successful_empty_query():
+    access = normalize_access_payload({"elements": []})
+
+    assert access["nearby_categories"]["groceries"] == 0
+    assert access["nearby_categories"]["transit"] == 0
+    assert access["daily_needs"] == 30
+    assert access["transit_access"] == 30
+    assert access["food_social"] == 30
+    assert access["parks_outdoors"] == 30
+    assert access["walkability"] == 30
+
+
+def test_normalize_access_payload_rejects_invalid_payload_shape():
+    with pytest.raises(ValueError, match="Overpass payload missing elements list"):
+        normalize_access_payload({"unexpected": []})
