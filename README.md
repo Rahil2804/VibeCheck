@@ -17,6 +17,7 @@ The app opens on a Mapbox 3D map. A user searches for an address or place, selec
 - Source freshness labels and single-place refresh controls for current and saved reports.
 - Ontario-first local open-data source depth with Toronto development and parks/amenity signals.
 - GTA/Ontario-first backend score depth that uses Toronto local parks and amenity signals conservatively without changing the current UI.
+- No-new-key Daily Needs Access scoring from bounded public OpenStreetMap/Overpass POI queries.
 - Source status handling for Mapbox, Census, housing, Reddit, and access data.
 - Partial results when sources fail, time out, or return no MVP data.
 - Rule-based confidence and lifestyle fit scoring.
@@ -131,6 +132,8 @@ Backend tests intentionally blank live API keys at pytest startup so they do not
 
 - Phase 1 source adapters are intentionally conservative and may return empty data without configured provider keys or deeper open-data coverage.
 - Mapbox search supports US and Canada in the frontend and backend resolver.
+- Daily Needs Access uses public OpenStreetMap contributor data through bounded Overpass-style POI queries; results may be incomplete or temporarily unavailable if the public endpoint is slow or rate-limited.
+- Access POI data is derived from OpenStreetMap contributors under the Open Database License.
 - Reddit is treated as anecdotal signal only.
 - The app does not make safety/crime claims in the MVP.
 - Confidence and source statuses are part of the response so missing data stays visible.
@@ -152,4 +155,4 @@ Backend tests intentionally blank live API keys at pytest startup so they do not
 
 ## Phase 2 Status
 
-Phase 2A added explicit local saved neighborhood reports. Phase 2B added reusable local preference profiles and then corrected the UI so profiles work as an app-level analysis lens selected before address search. Phase 2C adds typed provenance and compact source-support UI so major claims can be traced to normalized source signals. Phase 2D adds a dedicated compare mode for 2-4 ad hoc places using the active preference profile or Generic lens. Phase 2E adds source freshness labels and single-place refresh controls for current and saved reports. Phase 2F adds Ontario-first local open-data depth with Toronto development and parks/amenity signals, while unsupported Ontario municipalities degrade honestly. Phase 2G keeps the UI unchanged while bridging Toronto local parks/amenity data into existing backend score and fit logic. The next slices should focus on expanding Durham/Pickering coverage, preference scoring depth, and share/export flows.
+Phase 2A added explicit local saved neighborhood reports. Phase 2B added reusable local preference profiles and then corrected the UI so profiles work as an app-level analysis lens selected before address search. Phase 2C adds typed provenance and compact source-support UI so major claims can be traced to normalized source signals. Phase 2D adds a dedicated compare mode for 2-4 ad hoc places using the active preference profile or Generic lens. Phase 2E adds source freshness labels and single-place refresh controls for current and saved reports. Phase 2F adds Ontario-first local open-data depth with Toronto development and parks/amenity signals, while unsupported Ontario municipalities degrade honestly. Phase 2G keeps the UI unchanged while bridging Toronto local parks/amenity data into existing backend score and fit logic. Phase 2H adds no-new-key Daily Needs Access scoring from bounded public OpenStreetMap/Overpass POI queries. The next slices should focus on expanding Durham/Pickering coverage, preference scoring depth, and share/export flows.

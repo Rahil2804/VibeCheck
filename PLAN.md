@@ -341,6 +341,7 @@ Add these only after Phase 1 is stable:
 ### `backend/sources/access.py`
 
 - Build VibeCheck's own Daily Needs Access score instead of depending on Walk Score.
+- Use bounded public OSM/Overpass POI queries first so the access source does not require a paid API key.
 - Use Mapbox/OSM/Geoapify-style place categories if available within free tiers: grocery, pharmacy, parks, cafes, restaurants, transit stops, libraries, and gyms.
 - Prefer transparent sub-scores over a single black-box score: errands, transit, food/social, parks/outdoors, and useful services.
 - Explain the score in the UI so users can see which nearby amenities contributed.
@@ -575,6 +576,7 @@ Do not include `censusdatadownloader` for the MVP. Use direct Census API request
 - [x] Add source freshness labels and single-place report refresh controls.
 - [x] Add Ontario-first local open-data source depth with Toronto development and parks/amenity signals.
 - [x] Add GTA/Ontario-first backend score depth from Toronto parks and amenity signals without redesigning the UI.
+- [x] Add no-new-key GTA Daily Needs Access scoring from bounded public OSM/Overpass POI signals.
 - [x] Add UI affordances for synthesis status and local saved-profile handling.
 - [ ] Add regression tests for cache freshness and future backend compare response shape.
 
