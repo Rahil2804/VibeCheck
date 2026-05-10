@@ -120,3 +120,25 @@ def test_build_profile_provenance_cites_local_fields_for_scores_changed_by_local
     assert items["vibe.social_scene"].source_fields == ["local.community_amenities_count"]
     assert items["vibe.transit_access"].support == "unavailable"
     assert items["vibe.affordability"].support == "unavailable"
+
+
+def test_build_profile_provenance_cites_real_access_score_fields():
+    provenance = build_profile_provenance(
+        {
+            SourceName.ACCESS: {
+                "walkability": 76,
+                "transit_access": 67,
+                "daily_needs": 72,
+                "food_social": 71,
+                "parks_outdoors": 64,
+            }
+        },
+        [_status(SourceName.ACCESS, SourceStatusCode.SUCCESS)],
+    )
+
+    items = {item.claim_id: item for item in provenance.items}
+
+    assert items["vibe.walkability"].source_fields == ["access.walkability"]
+    assert items["vibe.transit_access"].source_fields == ["access.transit_access"]
+    assert items["vibe.walkability"].support == "inferred"
+    assert items["vibe.transit_access"].support == "inferred"

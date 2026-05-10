@@ -357,3 +357,49 @@ async def test_pipeline_bridges_local_parks_into_visible_scores():
     assert scores.parks_outdoors == 88
     assert scores.transit_access == 50
     assert scores.affordability == 50
+
+
+@pytest.mark.asyncio
+async def test_pipeline_uses_access_scores_for_visible_scores():
+    async def access_adapter(_context: SourceContext):
+        return SourceResult(
+            data={
+                "walkability": 76,
+                "transit_access": 67,
+                "daily_needs": 72,
+                "food_social": 71,
+                "parks_outdoors": 64,
+                "nearby_categories": {
+                    "groceries": 2,
+                    "pharmacies": 1,
+                    "restaurants": 8,
+                    "cafes": 3,
+                    "bars": 1,
+                    "transit": 5,
+                    "parks": 2,
+                    "libraries": 1,
+                    "community": 1,
+                },
+                "summary": "Nearby public POI signals found groceries and transit.",
+            },
+            message="Nearby public POI signals found groceries and transit.",
+            updated_at="2026-05-10T00:00:00+00:00",
+        )
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="Kensington Market, Toronto, ON"),
+        source_fetchers={SourceName.ACCESS: access_adapter},
+        source_timeout_seconds=1,
+        profile_synthesizer=_returns_none,
+    )
+
+    scores = response.profile.vibe_scores
+    assert scores.walkability == 76
+    assert scores.transit_access == 67
+    assert scores.parks_outdoors is None
+
+    access_status = next(
+        status for status in response.source_statuses if status.source == SourceName.ACCESS
+    )
+    assert access_status.status == SourceStatusCode.SUCCESS
+    assert access_status.updated_at == "2026-05-10T00:00:00+00:00"
