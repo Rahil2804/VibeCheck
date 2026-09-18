@@ -4,6 +4,8 @@ from backend.models import (
     EnergyPreference,
     NeighborhoodProfile,
     Preferences,
+    RentBenchmark,
+    RentalUnitSize,
     TopPriority,
     Trajectory,
     TrajectoryDirection,
@@ -21,6 +23,8 @@ def _profile(**score_overrides) -> NeighborhoodProfile:
         "quiet": 50,
         "social_scene": 50,
         "parks_outdoors": None,
+        "daily_needs": None,
+        "dining_activity": None,
     }
     scores.update(score_overrides)
     return NeighborhoodProfile(
@@ -48,7 +52,7 @@ def test_no_car_user_rewards_walkable_transit_rich_places():
     )
 
     assert fit.score > 60
-    assert any("no car" in flag.lower() for flag in fit.flags)
+    assert any("car-free" in factor.signal.lower() for factor in fit.factors)
 
 
 def test_no_car_user_penalizes_weak_access():
@@ -61,13 +65,13 @@ def test_no_car_user_penalizes_weak_access():
     assert "weak" in fit.explanation.lower()
 
 
-def test_quiet_and_lively_preferences_use_neutral_vibe_signals():
+def test_quiet_and_lively_preferences_use_only_supported_signals():
     quiet_fit = score_fit(
         _profile(quiet=82, social_scene=35),
         Preferences(energy_preference=EnergyPreference.QUIET),
     )
     lively_fit = score_fit(
-        _profile(quiet=35, social_scene=84),
+        _profile(quiet=35, dining_activity=84),
         Preferences(energy_preference=EnergyPreference.LIVELY),
     )
 
@@ -82,7 +86,7 @@ def test_top_priority_changes_score_and_explanation():
     )
 
     assert fit.score >= 65
-    assert "walkability" in fit.explanation.lower()
+    assert "daily needs" in fit.explanation.lower()
 
 
 def test_budget_sensitive_user_penalizes_low_affordability():
@@ -111,8 +115,9 @@ def test_parks_priority_no_longer_uses_quiet_as_proxy_when_parks_signal_is_missi
         Preferences(top_priority=TopPriority.PARKS_OUTDOORS),
     )
 
-    assert fit.score == 50
-    assert "neutral" in fit.explanation.lower()
+    assert fit.score is None
+    assert fit.label == "Not enough evidence"
+    assert "no numeric fit score" in fit.explanation.lower()
 
 
 def test_demographic_context_does_not_change_fit_score():
@@ -127,3 +132,59 @@ def test_demographic_context_does_not_change_fit_score():
     )
 
     assert score_fit(first, preferences).score == score_fit(second, preferences).score
+
+
+def test_non_negotiables_penalize_weak_evidence_and_skip_missing_evidence():
+    fit = score_fit(
+        _profile(transit_access=35, parks_outdoors=None),
+        Preferences(deal_breakers=["transit", "parks"]),
+    )
+
+    assert fit.score == 35
+    assert any("fails" in factor.explanation for factor in fit.factors)
+    assert any("parks" in flag for flag in fit.flags)
+
+
+def test_max_rent_uses_source_backed_cad_context():
+    profile = _profile()
+    profile.who_lives_here.rent_benchmark = RentBenchmark(
+        monthly_rent=2100,
+        unit_size=RentalUnitSize.ONE_BEDROOM,
+        geography="Toronto",
+        edition="CMHC 2025 Rental Market Report",
+        reference_year=2025,
+    )
+
+    fit = score_fit(
+        profile,
+        Preferences(
+            max_monthly_rent=1900,
+            rental_unit_size=RentalUnitSize.ONE_BEDROOM,
+        ),
+    )
+
+    assert fit.score == 35
+    assert fit.factors[0].signal == "Monthly rent (CAD)"
+
+
+def test_max_rent_never_substitutes_historical_shelter_cost_or_wrong_unit():
+    profile = _profile()
+    profile.who_lives_here.median_renter_shelter_cost = 1200
+    profile.who_lives_here.rent_benchmark = RentBenchmark(
+        monthly_rent=2100,
+        unit_size=RentalUnitSize.TWO_BEDROOM,
+        geography="Toronto",
+        edition="CMHC 2025 Rental Market Report",
+        reference_year=2025,
+    )
+
+    fit = score_fit(
+        profile,
+        Preferences(
+            max_monthly_rent=1900,
+            rental_unit_size=RentalUnitSize.ONE_BEDROOM,
+        ),
+    )
+
+    assert fit.score is None
+    assert fit.factors == []

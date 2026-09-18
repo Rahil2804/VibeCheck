@@ -1,14 +1,18 @@
 from unittest.mock import AsyncMock, Mock
+from datetime import timedelta
 
+import httpx
 import pytest
 
 from backend.models import AnalyzeRequest, Coordinates, Place
 from backend.sources.access import (
     ACCESS_RADIUS_METERS,
+    _should_cool_down,
     build_overpass_query,
     fetch_access_context,
     normalize_access_payload,
 )
+from backend.source_cache import set_cached_source
 from backend.sources.common import SourceContext
 
 
@@ -172,3 +176,81 @@ async def test_fetch_access_context_uses_http_client_and_returns_source_result()
     assert result.message == result.data["summary"]
     assert result.updated_at is not None
     client.post.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_fetch_access_context_uses_secondary_endpoint_after_406():
+    request = httpx.Request("POST", "https://overpass-api.de/api/interpreter")
+    rejected = Mock()
+    rejected.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "not acceptable",
+        request=request,
+        response=httpx.Response(406, request=request),
+    )
+    accepted = Mock()
+    accepted.raise_for_status.return_value = None
+    accepted.json.return_value = {"elements": [_element(1, {"shop": "supermarket"})]}
+    client = AsyncMock()
+    client.post.side_effect = [rejected, accepted]
+
+    result = await fetch_access_context(_context_with_coordinates(), client=client)
+
+    assert result.data["nearby_categories"]["groceries"] == 1
+    assert client.post.await_count == 2
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(400, False), (406, True), (429, True), (500, True), (503, True)],
+)
+def test_overpass_endpoint_cooldown_statuses(status, expected):
+    request = httpx.Request("POST", "https://example.test")
+    error = httpx.HTTPStatusError(
+        "failed",
+        request=request,
+        response=httpx.Response(status, request=request),
+    )
+
+    assert _should_cool_down(error) is expected
+
+
+def test_overpass_timeout_triggers_endpoint_cooldown():
+    assert _should_cool_down(httpx.ReadTimeout("timed out")) is True
+
+
+@pytest.mark.asyncio
+async def test_fetch_access_context_uses_seven_day_stale_cache_on_total_failure(
+    monkeypatch,
+    tmp_path,
+):
+    database = tmp_path / "cache.sqlite"
+    monkeypatch.setenv("SQLITE_PATH", str(database))
+    context = _context_with_coordinates()
+    cache_key = "osm:access:43.6540:-79.4010:1200"
+    cached_data = normalize_access_payload(
+        {"elements": [_element(1, {"shop": "supermarket"})]}
+    )
+    set_cached_source(
+        cache_key,
+        {
+            "data": cached_data,
+            "message": cached_data["summary"],
+            "updated_at": "2026-09-15T00:00:00+00:00",
+            "source_url": "https://overpass-api.de/api/interpreter",
+        },
+        ttl=timedelta(hours=-1),
+        db_path=database,
+    )
+    client = AsyncMock()
+    client.post.side_effect = [
+        httpx.ReadTimeout("primary timeout"),
+        httpx.ReadTimeout("secondary timeout"),
+    ]
+    monkeypatch.setattr(httpx, "AsyncClient", Mock(return_value=client))
+
+    result = await fetch_access_context(context)
+
+    assert result.stale is True
+    assert result.data == cached_data
+    assert "last successful OSM" in result.message
+    assert client.post.await_count == 2

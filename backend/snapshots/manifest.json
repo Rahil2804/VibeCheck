@@ -1,0 +1,183 @@
+{
+  "schema_version": 3,
+  "snapshot_id": "gta-20260918-e30a5629fc62",
+  "edition": "GTA evidence snapshot 2025/2026",
+  "editions": {
+    "transit": "Feed-specific service dates in feed_validity",
+    "rent": "CMHC 2025 Rental Market Report",
+    "cycling": "City of Toronto network current at retrieval",
+    "bike_share": "Station information current at retrieval",
+    "toronto_profiles": "2021 Census, Toronto 158-neighbourhood model",
+    "census_subdivisions": "Statistics Canada 2021 Census Profile"
+  },
+  "created_at": "2026-09-18T02:54:20.920814+00:00",
+  "artifact": "gta_snapshot.sqlite",
+  "artifact_bytes": 13111296,
+  "artifact_sha256": "e30a5629fc626c94e9f181334966fb5761b0b6988bda4fc148086e30e7a3e56f",
+  "sources": [
+    {
+      "name": "TTC GTFS",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/7795b45e-e65a-4465-81fc-c36b9dfff169/resource/cfb6b2b8-6191-41e3-bda1-b175c51148cb/download/opendata_ttc_schedules.zip",
+      "retrieved_at": "2026-09-18T02:47:31.808942+00:00",
+      "sha256": "79294c53420b985986705f2aad173a249abc9b65387ee7a90686b4dedd65256d",
+      "bytes": 36321616
+    },
+    {
+      "name": "GO GTFS",
+      "url": "https://assets.metrolinx.com/raw/upload/v1683228856/Documents/Metrolinx/Open%20Data/GO-GTFS.zip",
+      "retrieved_at": "2026-09-18T02:47:32.450213+00:00",
+      "sha256": "e2c80eeed718af9e58315c4198b1bd7e338a00171c658197f04d116421f14fc6",
+      "bytes": 22206353
+    },
+    {
+      "name": "UP GTFS",
+      "url": "https://assets.metrolinx.com/raw/upload/v1682367798/Documents/Metrolinx/Open%20Data/UP-GTFS.zip",
+      "retrieved_at": "2026-09-18T02:47:32.509268+00:00",
+      "sha256": "a8f2147147143a0068a93cf7c7ec73d050d9a3f95004967535ef7eed0a256320",
+      "bytes": 898079
+    },
+    {
+      "name": "MiWay GTFS",
+      "url": "https://www.miapp.ca/GTFS/google_transit.zip",
+      "retrieved_at": "2026-09-18T02:47:32.809583+00:00",
+      "sha256": "f43fb0a9de891dbdcee34b8e7700739a797c83df05968b7213ef50ab20e306fa",
+      "bytes": 8007292
+    },
+    {
+      "name": "Brampton Transit GTFS",
+      "url": "https://www.arcgis.com/sharing/rest/content/items/a355aabd5a8c490186bdce559c9c75fb/data",
+      "retrieved_at": "2026-09-18T02:47:33.414226+00:00",
+      "sha256": "7bacfd0426508ab10234f00d61f6329ce0568a43781c917ec175838775ae7d10",
+      "bytes": 7522666
+    },
+    {
+      "name": "YRT GTFS",
+      "url": "https://www.yrt.ca/google/google_transit.zip",
+      "retrieved_at": "2026-09-18T02:47:33.836973+00:00",
+      "sha256": "3245c92a42f2ca0598ab0d072f90464fd7d41add96ff9b8eddf7eb39cdbb1e41",
+      "bytes": 5269125
+    },
+    {
+      "name": "Durham Region Transit GTFS",
+      "url": "https://maps.durham.ca/OpenDataGTFS/GTFS_Durham_TXT.zip",
+      "retrieved_at": "2026-09-18T02:47:34.065099+00:00",
+      "sha256": "2a22d0b5752500b47b9a672f1477afc050a313d79447554ad13f832c8cf578b6",
+      "bytes": 3829389
+    },
+    {
+      "name": "CMHC 2025 rental tables",
+      "url": "https://assets.cmhc-schl.gc.ca/sites/cmhc/professional/housing-markets-data-and-research/housing-data-tables/rental-market/rental-market-report-data-tables/2025/rmr-toronto-2025-en.xlsx?rev=f107330e-4620-4462-9027-8c6ff1522f1a",
+      "retrieved_at": "2026-09-18T02:47:51.441054+00:00",
+      "sha256": "99ad5966bead408ce75761a8a9540d2748cd28deb764a42d16ffde32facf9f6d",
+      "bytes": 269587
+    },
+    {
+      "name": "Toronto cycling network",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/abbe5ee3-e249-4f86-a219-f0022eaddcc9/resource/023da9a2-8848-4e10-9cad-e7f9119cd874/download/cycling-network-4326.geojson",
+      "retrieved_at": "2026-09-18T02:47:51.441411+00:00",
+      "sha256": "c5d53a5fd367d39da5cdd58f97b8f95d4d94fcbc760ab15d55620c34dfc6fec1",
+      "bytes": 3263145
+    },
+    {
+      "name": "Bike Share GBFS catalogue",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/2b44db0d-eea9-442d-b038-79335368ad5a/resource/b69873a1-c180-4ccd-a970-514e434b4971/download/bike-share-gbfs-general-bikeshare-feed-specification.json",
+      "retrieved_at": "2026-09-18T02:47:51.451311+00:00",
+      "sha256": "e12b33d8fdcac38d79742e78584ded7ada8c858d56d824fe3bcb6f88a485e024",
+      "bytes": 577
+    },
+    {
+      "name": "Bike Share station information",
+      "url": "https://tor.publicbikesystem.net/ube/gbfs/v1/en/station_information",
+      "retrieved_at": "2026-09-18T02:47:51.451371+00:00",
+      "sha256": "6dd496c470ccec7ee79c654bdcb93b3250e91da1361e220874a0425fb0b67c43",
+      "bytes": 571514
+    },
+    {
+      "name": "Toronto neighbourhood boundaries",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/fc443770-ef0a-4025-9c2c-2cb558bfab00/resource/0719053b-28b7-48ea-b863-068823a93aaa/download/neighbourhoods-4326.geojson",
+      "retrieved_at": "2026-09-18T02:47:51.452006+00:00",
+      "sha256": "b0cb58077f5b3a47e0e56a68913c6980cfaf39d37d7d020fd91b60650c480233",
+      "bytes": 2141269
+    },
+    {
+      "name": "Toronto 2021 neighbourhood profiles",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/6e19a90f-971c-46b3-852c-0c48c436d1fc/resource/19d4a806-7385-4889-acf2-256f1e079060/download/nbhd_2021_census_profile_full_158model.xlsx",
+      "retrieved_at": "2026-09-18T02:47:51.454284+00:00",
+      "sha256": "9a3c372907e9de09407d847398703146a9cfc0f5b2217446fd61ab8ab35345eb",
+      "bytes": 1763175
+    },
+    {
+      "name": "Statistics Canada 2021 census subdivision boundaries",
+      "url": "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Digital_boundary_files/MapServer/9/query?where=CSDUID+IN+%28%273518001%27%2C%273518005%27%2C%273518009%27%2C%273518013%27%2C%273518017%27%2C%273518020%27%2C%273518029%27%2C%273518039%27%2C%273519028%27%2C%273519036%27%2C%273519038%27%2C%273519044%27%2C%273519046%27%2C%273519048%27%2C%273519049%27%2C%273519054%27%2C%273519070%27%2C%273520005%27%2C%273521005%27%2C%273521010%27%2C%273521024%27%2C%273524001%27%2C%273524002%27%2C%273524009%27%2C%273524015%27%29&outFields=CSDUID%2CCSDNAME%2CCSDTYPE%2CPRUID&returnGeometry=true&outSR=4326&f=geojson",
+      "retrieved_at": "2026-09-18T02:47:51.456151+00:00",
+      "sha256": "c99a93d0dd3730980abcd752a5bbdf3fb1a331e3e4b5e59eb8b1724f93346038",
+      "bytes": 1782484
+    },
+    {
+      "name": "Statistics Canada 2021 Census Profile",
+      "url": "https://www12.statcan.gc.ca/census-recensement/2021/dp-pd/prof/details/download-telecharger/comp/getFile.cfm?LANG=E&GEONO=005&FILETYPE=CSV",
+      "retrieved_at": "2026-09-18T02:47:51.458028+00:00",
+      "sha256": "d7f2543186935ca7d9f5a8a21ecf2084d75ccce9d15ef3cd09ce1d237c383e03",
+      "bytes": 196875109
+    }
+  ],
+  "feed_validity": [
+    {
+      "agency": "Brampton Transit",
+      "service_date": "2026-09-15",
+      "valid_until": "2026-09-15"
+    },
+    {
+      "agency": "Durham Region Transit",
+      "service_date": "2026-09-15",
+      "valid_until": "2026-10-18"
+    },
+    {
+      "agency": "GO",
+      "service_date": "2026-09-22",
+      "valid_until": "2026-09-22"
+    },
+    {
+      "agency": "MiWay",
+      "service_date": "2026-09-15",
+      "valid_until": "2026-09-15"
+    },
+    {
+      "agency": "TTC",
+      "service_date": "2026-09-15",
+      "valid_until": "2026-10-31"
+    },
+    {
+      "agency": "UP",
+      "service_date": "2026-09-15",
+      "valid_until": "2026-09-15"
+    },
+    {
+      "agency": "YRT",
+      "service_date": "2026-09-15",
+      "valid_until": "2026-10-31"
+    }
+  ],
+  "licences": [
+    {
+      "name": "Open Government Licence - Toronto",
+      "url": "https://open.toronto.ca/open-data-license/"
+    },
+    {
+      "name": "Metrolinx Open Data Licence",
+      "url": "https://www.metrolinx.com/en/about-us/open-data"
+    },
+    {
+      "name": "Municipal open-data terms",
+      "url": "https://www.ontario.ca/page/open-government-licence-ontario"
+    },
+    {
+      "name": "CMHC data terms",
+      "url": "https://www.cmhc-schl.gc.ca/about-us/copyright-and-permissions"
+    },
+    {
+      "name": "Open Government Licence - Canada",
+      "url": "https://open.canada.ca/en/open-government-licence-canada"
+    }
+  ]
+}

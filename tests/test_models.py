@@ -58,6 +58,10 @@ def test_source_status_has_consistent_serializable_shape():
         "status": "success",
         "message": "ACS context returned.",
         "updated_at": "2026-04-30",
+        "edition": None,
+        "scope": None,
+        "source_url": None,
+        "stale": None,
     }
 
 
@@ -91,11 +95,22 @@ def test_preference_profile_rejects_unsafe_categories():
 
 
 def test_preference_profile_update_allows_partial_changes():
-    update = PreferenceProfileUpdate(name="Budget-first", must_haves=["lower_rent_pressure"])
+    update = PreferenceProfileUpdate(
+        name="Budget-first", must_haves=["lower_rent_pressure"]
+    )
 
     assert update.name == "Budget-first"
     assert update.must_haves == ["lower_rent_pressure"]
     assert update.preferences.car_reliance is None
+
+
+def test_preference_profile_requires_disjoint_positive_requirements():
+    with pytest.raises(ValidationError):
+        PreferenceProfileCreate(
+            name="Overlapping",
+            must_haves=["transit"],
+            deal_breakers=["transit"],
+        )
 
 
 def test_analyze_request_accepts_preference_profile_id():

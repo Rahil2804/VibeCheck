@@ -2,7 +2,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import load_environment
+from backend.doctor import collect_health
 from backend.models import (
+    AnalysisLensMode,
+    AnalysisLensSnapshot,
     AnalyzeRequest,
     AnalyzeResponse,
     DeletePreferenceProfileResponse,
@@ -53,12 +56,19 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, object]:
+    return collect_health()
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
+    lens = AnalysisLensSnapshot(
+        mode=AnalysisLensMode.GENERIC
+        if request.generic_mode
+        else AnalysisLensMode.CUSTOM,
+        profile_name="Generic" if request.generic_mode else "Custom preferences",
+        preferences=request.preferences,
+    )
     if request.preference_profile_id is not None:
         profile = get_preference_profile(request.preference_profile_id)
         if profile is None:
@@ -69,11 +79,21 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
                 "generic_mode": profile.generic_mode,
             }
         )
-    return await analyze_neighborhood(request)
+        lens = AnalysisLensSnapshot(
+            mode=AnalysisLensMode.GENERIC
+            if profile.generic_mode
+            else AnalysisLensMode.SAVED_PROFILE,
+            profile_id=profile.id,
+            profile_name=profile.name,
+            preferences=profile.preferences,
+        )
+    return await analyze_neighborhood(request, analysis_lens=lens)
 
 
 @app.post("/preference-profiles", response_model=PreferenceProfile)
-async def create_preference_profile_endpoint(profile: PreferenceProfileCreate) -> PreferenceProfile:
+async def create_preference_profile_endpoint(
+    profile: PreferenceProfileCreate,
+) -> PreferenceProfile:
     return create_preference_profile(profile)
 
 
@@ -101,8 +121,12 @@ async def update_preference_profile_endpoint(
     return profile
 
 
-@app.delete("/preference-profiles/{profile_id}", response_model=DeletePreferenceProfileResponse)
-async def delete_preference_profile_endpoint(profile_id: str) -> DeletePreferenceProfileResponse:
+@app.delete(
+    "/preference-profiles/{profile_id}", response_model=DeletePreferenceProfileResponse
+)
+async def delete_preference_profile_endpoint(
+    profile_id: str,
+) -> DeletePreferenceProfileResponse:
     deleted = delete_preference_profile(profile_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Preference profile not found.")
@@ -136,22 +160,16 @@ async def refresh_profile(profile_id: str) -> SavedProfile:
         raise HTTPException(status_code=404, detail="Saved profile not found.")
 
     request = build_refresh_request(saved)
-    if (
-        request.preference_profile_id is not None
-        and get_preference_profile(request.preference_profile_id) is None
-    ):
-        request = request.model_copy(update={"preference_profile_id": None})
-        if not any(
-            (
-                request.preferences.car_reliance,
-                request.preferences.energy_preference,
-                request.preferences.top_priority,
-                request.preferences.budget_sensitivity,
-            )
-        ):
-            request = request.model_copy(update={"generic_mode": True})
-
-    response = await analyze(request)
+    lens = saved.analysis_lens
+    request = request.model_copy(
+        update={
+            "preference_profile_id": None,
+            "preferences": lens.preferences,
+            "generic_mode": lens.mode
+            in {AnalysisLensMode.GENERIC, AnalysisLensMode.LEGACY},
+        }
+    )
+    response = await analyze_neighborhood(request, analysis_lens=lens)
     updated = update_saved_profile(profile_id, response, analyze_request=request)
     if updated is None:
         raise HTTPException(status_code=404, detail="Saved profile not found.")

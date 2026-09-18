@@ -94,3 +94,15 @@ def test_detects_gta_municipalities_without_treating_them_as_toronto():
     assert is_gta_place(richmond_hill) is True
     assert is_toronto_place(pickering) is False
     assert is_toronto_place(richmond_hill) is False
+
+
+def test_east_york_address_is_toronto_by_coordinates():
+    place = Place(
+        label="79 Thorncliffe Park Drive, East York, Ontario, Canada",
+        city="East York",
+        state="Ontario",
+        coordinates=Coordinates(lat=43.706134, lng=-79.341499),
+    )
+
+    assert is_toronto_place(place) is True
+    assert is_gta_place(place) is True

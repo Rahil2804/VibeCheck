@@ -215,6 +215,16 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Browser test artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/coverage/
+frontend/.vite/
+
+# Local runtime and browser profiles
+.tmp/
+.logs/
+
 # PyPI configuration file
 .pypirc
 

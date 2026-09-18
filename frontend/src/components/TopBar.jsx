@@ -1,35 +1,35 @@
-import { Archive, Scale, UserRound } from 'lucide-react';
+import { Archive, Scale, SlidersHorizontal } from 'lucide-react';
 import SearchBar from './SearchBar.jsx';
 
 export default function TopBar({
-  activeProfile,
-  preferenceProfileError,
+  activeLens,
   onProfileClick,
   onSavedReportsClick,
   onCompareClick,
   onSelectPlace,
 }) {
   return (
-    <header className="top-bar">
-      <div className="brand-lockup">VibeCheck</div>
-      <button type="button" className="active-profile-button" onClick={onProfileClick}>
-        <UserRound size={15} aria-hidden="true" />
-        <span>
-          <small>Active Profile</small>
-          {activeProfile?.name || 'Generic'}
-        </span>
+    <header className="command-bar">
+      <a className="brand-lockup" href="/" aria-label="VibeCheck home">
+        <i aria-hidden="true">V</i>
+        <span>VibeCheck</span>
+      </a>
+      <button
+        type="button"
+        className="lens-button"
+        aria-label={`Analysis lens: ${activeLens?.profile_name || 'Generic'}`}
+        onClick={onProfileClick}
+      >
+        <SlidersHorizontal size={17} aria-hidden="true" />
+        <span><small>Analysis lens</small>{activeLens?.profile_name || 'Generic'}</span>
       </button>
-      <div className="top-search">
-        <SearchBar onSelect={onSelectPlace} />
-      </div>
-      <button type="button" className="compare-top-button" onClick={onCompareClick} aria-label="Compare places">
-        <Scale size={16} aria-hidden="true" />
-        <span>Compare</span>
+      <div className="command-search"><SearchBar onSelect={onSelectPlace} /></div>
+      <button type="button" className="command-action" aria-label="Compare" onClick={onCompareClick}>
+        <Scale size={17} aria-hidden="true" /><span>Compare</span>
       </button>
-      <button type="button" className="top-icon-button" onClick={onSavedReportsClick} aria-label="Saved reports">
-        <Archive size={17} aria-hidden="true" />
+      <button type="button" className="command-action" aria-label="Saved reports" onClick={onSavedReportsClick}>
+        <Archive size={17} aria-hidden="true" /><span>Saved reports</span>
       </button>
-      {preferenceProfileError && <p className="top-bar-error">{preferenceProfileError}</p>}
     </header>
   );
 }

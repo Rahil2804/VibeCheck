@@ -1,74 +1,115 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from math import asin, cos, radians, sin, sqrt
 from typing import Any
 
 import httpx
 
 from backend.models import Coordinates
+from backend.source_cache import get_cached_source, set_cached_source
 from backend.sources.common import SourceContext, SourceResult
-
-
-TORONTO_PERMITS_PACKAGE_URL = (
-    "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
-    "?id=building-permits-active-permits"
+from backend.sources.ontario.toronto_profiles import (
+    TORONTO_NEIGHBOURHOODS_URL,
+    TORONTO_PROFILE_WORKBOOK_URL,
+    lookup_bundled_toronto_profile,
+    normalize_toronto_neighbourhood_profile,
 )
+
+
 TORONTO_PARKS_PACKAGE_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
     "?id=parks-and-recreation-facilities"
 )
 TORONTO_RADIUS_KM = 1.5
-MAJOR_PERMIT_KEYWORDS = ("new building", "demolition", "addition")
 
 
-async def fetch_toronto_context(context: SourceContext) -> SourceResult:
+async def fetch_toronto_context(
+    context: SourceContext,
+    client: httpx.AsyncClient | None = None,
+) -> SourceResult:
     if context.place.coordinates is None:
-        return SourceResult(data={}, message="Toronto local lookup needs resolved coordinates.")
-
-    async with httpx.AsyncClient(timeout=8) as client:
-        permits_response = await client.get(TORONTO_PERMITS_PACKAGE_URL)
-        permits_response.raise_for_status()
-        parks_payload = await _download_package_resource(
-            client,
-            TORONTO_PARKS_PACKAGE_URL,
-            preferred_formats=("GeoJSON", "JSON"),
-            preferred_name="4326.geojson",
+        return SourceResult(
+            data={}, message="Toronto local lookup needs resolved coordinates."
         )
 
-    permit_records: list[dict[str, Any]] = []
+    coordinates = context.place.coordinates
+    cache_key = f"toronto:local:2021:{coordinates.lat:.4f}:{coordinates.lng:.4f}"
+    cached = get_cached_source(cache_key) if client is None else None
+    if cached is not None:
+        return SourceResult(
+            data=cached["data"],
+            message=cached["message"],
+            updated_at=cached["updated_at"],
+        )
+
+    parks_payload: dict[str, Any] = {}
+    profile_data: dict[str, Any] = (
+        lookup_bundled_toronto_profile(coordinates) if client is None else {}
+    )
+    should_close = client is None
+    http_client = client or httpx.AsyncClient(timeout=20)
+    try:
+        try:
+            parks_payload = await _download_package_resource(
+                http_client,
+                TORONTO_PARKS_PACKAGE_URL,
+                preferred_formats=("GeoJSON", "JSON"),
+                preferred_name="4326.geojson",
+            )
+        except Exception:
+            parks_payload = {}
+        if not profile_data:
+            try:
+                boundaries_response = await http_client.get(TORONTO_NEIGHBOURHOODS_URL)
+                boundaries_response.raise_for_status()
+                workbook_response = await http_client.get(TORONTO_PROFILE_WORKBOOK_URL)
+                workbook_response.raise_for_status()
+                profile_data = normalize_toronto_neighbourhood_profile(
+                    boundaries_response.json(),
+                    workbook_response.content,
+                    coordinates,
+                )
+            except Exception:
+                profile_data = {}
+    finally:
+        if should_close:
+            await http_client.aclose()
+
     amenity_records = (
         parks_payload.get("features", []) if isinstance(parks_payload, dict) else []
     )
     updated_at = datetime.now(UTC).isoformat()
     data = normalize_toronto_open_data(
-        permit_records,
+        [],
         amenity_records,
         context.place.coordinates,
         updated_at=updated_at,
     )
+    data.update(profile_data)
     if not _has_meaningful_local_data(data):
         return SourceResult(
             data={},
-            message="Toronto open data returned no nearby development or parks signals.",
+            message="Toronto open data returned no nearby neighbourhood or parks context.",
             updated_at=updated_at,
         )
     message = _source_message(data)
+    if client is None:
+        set_cached_source(
+            cache_key,
+            {"data": data, "message": message, "updated_at": updated_at},
+            ttl=timedelta(days=7),
+        )
     return SourceResult(data=data, message=message, updated_at=updated_at)
 
 
 def normalize_toronto_open_data(
-    permit_records: list[dict[str, Any]],
+    _deferred_permit_records: list[dict[str, Any]],
     amenity_records: list[dict[str, Any]],
     center: Coordinates,
     *,
     updated_at: str,
 ) -> dict[str, Any]:
-    permits = summarize_permit_records(
-        permit_records,
-        center,
-        radius_km=TORONTO_RADIUS_KM,
-    )
     amenities = summarize_amenity_records(
         amenity_records,
         center,
@@ -76,32 +117,9 @@ def normalize_toronto_open_data(
     )
     return {
         "coverage_area": "Toronto",
-        **permits,
         **amenities,
-        "summary": "Toronto open data returned nearby development and parks/amenity signals.",
+        "summary": "Toronto open data returned nearby parks and recreation context.",
         "updated_at": updated_at,
-    }
-
-
-def summarize_permit_records(
-    records: list[dict[str, Any]],
-    center: Coordinates,
-    *,
-    radius_km: float,
-) -> dict[str, Any]:
-    nearby = [record for record in records if _is_nearby(record, center, radius_km)]
-    major = [record for record in nearby if _is_major_permit(record)]
-    development_activity = _clamp_score(len(nearby) * 12 + len(major) * 8)
-    trajectory_signal = "uncertain"
-    if development_activity >= 50 or len(major) >= 3:
-        trajectory_signal = "rising"
-    elif nearby:
-        trajectory_signal = "stable"
-    return {
-        "development_activity": development_activity,
-        "recent_permits_count": len(nearby),
-        "major_project_count": len(major),
-        "trajectory_signal": trajectory_signal,
     }
 
 
@@ -166,7 +184,9 @@ def _select_resource(
         resource_format = str(resource.get("format") or "").lower()
         if resource_format in normalized_formats and resource.get("url"):
             return resource
-    raise ValueError(f"No Toronto resource found for formats: {', '.join(preferred_formats)}")
+    raise ValueError(
+        f"No Toronto resource found for formats: {', '.join(preferred_formats)}"
+    )
 
 
 def _is_nearby(record: dict[str, Any], center: Coordinates, radius_km: float) -> bool:
@@ -223,11 +243,6 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
-def _is_major_permit(record: dict[str, Any]) -> bool:
-    text = _record_text(record)
-    return any(keyword in text for keyword in MAJOR_PERMIT_KEYWORDS)
-
-
 def _record_text(record: dict[str, Any]) -> str:
     parts: list[str] = []
     for value in record.values():
@@ -270,11 +285,9 @@ def _clamp_score(value: int | float) -> int:
 
 
 def _has_meaningful_local_data(data: dict[str, Any]) -> bool:
-    return any(
+    return bool(data.get("neighbourhood_id")) or any(
         int(data.get(key, 0) or 0) > 0
         for key in (
-            "recent_permits_count",
-            "major_project_count",
             "parks_count",
             "community_amenities_count",
         )
@@ -282,16 +295,13 @@ def _has_meaningful_local_data(data: dict[str, Any]) -> bool:
 
 
 def _source_message(data: dict[str, Any]) -> str:
-    permit_count = int(data.get("recent_permits_count", 0) or 0)
     park_count = int(data.get("parks_count", 0) or 0)
     amenity_count = int(data.get("community_amenities_count", 0) or 0)
-    if permit_count and (park_count or amenity_count):
-        return "Toronto open data returned development and parks signals."
+    has_profile = bool(data.get("neighbourhood_id"))
+    if has_profile and (park_count or amenity_count):
+        return "Toronto open data returned 2021 neighbourhood and nearby parks context."
+    if has_profile:
+        return "Toronto open data returned 2021 neighbourhood context."
     if park_count or amenity_count:
-        return (
-            "Toronto open data returned parks signals; local permit records need "
-            "address-point matching before development scoring."
-        )
-    if permit_count:
-        return "Toronto open data returned development signals."
+        return "Toronto open data returned nearby parks context."
     return "Toronto open data returned local signals."

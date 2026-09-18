@@ -9,8 +9,8 @@ import {
 } from './preferenceProfiles.js';
 
 const PLACE = {
-  label: 'Mission District, San Francisco, CA',
-  coordinates: { lat: 37.7599, lng: -122.4148 },
+  label: 'The Annex, Toronto, ON',
+  coordinates: { lat: 43.6703, lng: -79.4077 },
 };
 
 const PROFILES = [
@@ -88,6 +88,7 @@ describe('profile update payload clearing', () => {
           commute_anchor_lat: '',
           commute_anchor_lng: '',
           max_monthly_rent: '',
+          rental_unit_size: '',
           must_haves: [],
           deal_breakers: [],
           notes: '',
@@ -103,6 +104,7 @@ describe('profile update payload clearing', () => {
         generic_mode: false,
         commute_anchor: null,
         max_monthly_rent: null,
+        rental_unit_size: null,
         must_haves: [],
         deal_breakers: [],
         notes: null,
@@ -114,8 +116,8 @@ describe('profile update payload clearing', () => {
 describe('buildAnalyzePayload', () => {
   it('sends profile id for saved profile analysis', () => {
     assert.deepEqual(buildAnalyzePayload(PLACE, PROFILES[0]), {
-      query: 'Mission District, San Francisco, CA',
-      coordinates: { lat: 37.7599, lng: -122.4148 },
+      query: 'The Annex, Toronto, ON',
+      coordinates: { lat: 43.6703, lng: -79.4077 },
       generic_mode: false,
       preference_profile_id: 'profile-1',
     });
@@ -123,8 +125,8 @@ describe('buildAnalyzePayload', () => {
 
   it('sends generic mode without profile id when no saved profile is active', () => {
     assert.deepEqual(buildAnalyzePayload(PLACE, null), {
-      query: 'Mission District, San Francisco, CA',
-      coordinates: { lat: 37.7599, lng: -122.4148 },
+      query: 'The Annex, Toronto, ON',
+      coordinates: { lat: 43.6703, lng: -79.4077 },
       preferences: {},
       generic_mode: true,
     });
@@ -148,6 +150,7 @@ describe('profile form serialization', () => {
       commute_anchor_lat: '43.645',
       commute_anchor_lng: '-79.38',
       max_monthly_rent: '2200',
+      rental_unit_size: '',
       must_haves: ['transit', 'groceries'],
       deal_breakers: ['lower_rent_pressure'],
       notes: 'Local only.',

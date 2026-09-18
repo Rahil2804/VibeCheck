@@ -9,76 +9,10 @@ from backend.sources.ontario.toronto import (
     fetch_toronto_context,
     normalize_toronto_open_data,
     summarize_amenity_records,
-    summarize_permit_records,
 )
 
 
 CENTER = Coordinates(lat=43.654, lng=-79.401)
-
-
-def test_summarize_permit_records_counts_nearby_and_major_projects():
-    records = [
-        {
-            "LATITUDE": "43.6542",
-            "LONGITUDE": "-79.4008",
-            "PERMIT_TYPE": "New Building",
-            "STATUS": "Permit Issued",
-        },
-        {
-            "latitude": 43.655,
-            "longitude": -79.402,
-            "permit_type": "Interior Alterations",
-            "status": "Inspection",
-        },
-        {
-            "LATITUDE": "43.7000",
-            "LONGITUDE": "-79.5000",
-            "PERMIT_TYPE": "New Building",
-            "STATUS": "Permit Issued",
-        },
-    ]
-
-    summary = summarize_permit_records(records, CENTER, radius_km=1.5)
-
-    assert summary["recent_permits_count"] == 2
-    assert summary["major_project_count"] == 1
-    assert summary["development_activity"] == 32
-    assert summary["trajectory_signal"] == "stable"
-
-
-def test_summarize_permit_records_marks_rising_for_high_activity():
-    records = [
-        {
-            "LATITUDE": "43.6542",
-            "LONGITUDE": "-79.4008",
-            "PERMIT_TYPE": "New Building",
-            "STATUS": "Permit Issued",
-        },
-        {
-            "LATITUDE": "43.6543",
-            "LONGITUDE": "-79.4007",
-            "PERMIT_TYPE": "Demolition",
-            "STATUS": "Permit Issued",
-        },
-        {
-            "LATITUDE": "43.6544",
-            "LONGITUDE": "-79.4006",
-            "PERMIT_TYPE": "Addition",
-            "STATUS": "Permit Issued",
-        },
-        {
-            "LATITUDE": "43.6545",
-            "LONGITUDE": "-79.4005",
-            "PERMIT_TYPE": "Interior Alterations",
-            "STATUS": "Inspection",
-        },
-    ]
-
-    summary = summarize_permit_records(records, CENTER, radius_km=1.5)
-
-    assert summary["major_project_count"] == 3
-    assert summary["development_activity"] == 72
-    assert summary["trajectory_signal"] == "rising"
 
 
 def test_summarize_amenity_records_counts_parks_and_recreation_centres():
@@ -134,7 +68,7 @@ def test_summarize_amenity_records_handles_toronto_multipoint_geometry():
     assert summary["parks_outdoors"] == 12
 
 
-def test_normalize_toronto_open_data_combines_permits_and_amenities():
+def test_normalize_toronto_open_data_defers_permits_and_keeps_amenities():
     permits = [
         {
             "LATITUDE": "43.6542",
@@ -162,16 +96,14 @@ def test_normalize_toronto_open_data_combines_permits_and_amenities():
     )
 
     assert normalized["coverage_area"] == "Toronto"
-    assert normalized["recent_permits_count"] == 1
+    assert "recent_permits_count" not in normalized
+    assert "development_activity" not in normalized
     assert normalized["parks_count"] == 1
     assert normalized["updated_at"] == "2026-05-08T00:00:00+00:00"
     assert "Toronto open data" in normalized["summary"]
 
 
 def test_toronto_package_urls_use_live_ckan_api_host():
-    assert toronto.TORONTO_PERMITS_PACKAGE_URL.startswith(
-        "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
-    )
     assert toronto.TORONTO_PARKS_PACKAGE_URL.startswith(
         "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
     )
@@ -220,19 +152,6 @@ async def test_fetch_toronto_context_downloads_and_normalizes(monkeypatch):
                     "result": {
                         "resources": [
                             {
-                                "name": "building-permits-active-permits.json",
-                                "format": "JSON",
-                                "url": "https://example.test/permits.json",
-                            }
-                        ]
-                    }
-                }
-            ),
-            _response(
-                {
-                    "result": {
-                        "resources": [
-                            {
                                 "name": "Parks and Recreation Facilities - 4326.geojson",
                                 "format": "GeoJSON",
                                 "url": "https://example.test/parks.geojson",
@@ -254,22 +173,26 @@ async def test_fetch_toronto_context_downloads_and_normalizes(monkeypatch):
                     ]
                 }
             ),
+            _response({"features": []}),
+            httpx.Response(
+                200,
+                content=b"",
+                request=httpx.Request("GET", "https://example.test"),
+            ),
         ]
     )
-    monkeypatch.setattr(toronto.httpx, "AsyncClient", lambda **_kwargs: client)
 
-    result = await fetch_toronto_context(_toronto_context())
+    result = await fetch_toronto_context(_toronto_context(), client=client)
 
     assert result.data["coverage_area"] == "Toronto"
-    assert result.data["recent_permits_count"] == 0
+    assert "recent_permits_count" not in result.data
     assert result.data["parks_count"] == 1
-    assert result.message == (
-        "Toronto open data returned parks signals; local permit records need address-point matching before development scoring."
-    )
+    assert result.message == "Toronto open data returned nearby parks context."
     assert client.urls == [
-        toronto.TORONTO_PERMITS_PACKAGE_URL,
         toronto.TORONTO_PARKS_PACKAGE_URL,
         "https://example.test/parks.geojson",
+        toronto.TORONTO_NEIGHBOURHOODS_URL,
+        toronto.TORONTO_PROFILE_WORKBOOK_URL,
     ]
 
 
@@ -277,19 +200,6 @@ async def test_fetch_toronto_context_downloads_and_normalizes(monkeypatch):
 async def test_fetch_toronto_context_returns_empty_when_no_nearby_records(monkeypatch):
     client = FakeAsyncClient(
         [
-            _response(
-                {
-                    "result": {
-                        "resources": [
-                            {
-                                "name": "building-permits-active-permits.json",
-                                "format": "JSON",
-                                "url": "https://example.test/permits.json",
-                            }
-                        ]
-                    }
-                }
-            ),
             _response(
                 {
                     "result": {
@@ -304,11 +214,19 @@ async def test_fetch_toronto_context_returns_empty_when_no_nearby_records(monkey
                 }
             ),
             _response({"features": []}),
+            _response({"features": []}),
+            httpx.Response(
+                200,
+                content=b"",
+                request=httpx.Request("GET", "https://example.test"),
+            ),
         ]
     )
-    monkeypatch.setattr(toronto.httpx, "AsyncClient", lambda **_kwargs: client)
 
-    result = await fetch_toronto_context(_toronto_context())
+    result = await fetch_toronto_context(_toronto_context(), client=client)
 
     assert result.data == {}
-    assert result.message == "Toronto open data returned no nearby development or parks signals."
+    assert (
+        result.message
+        == "Toronto open data returned no nearby neighbourhood or parks context."
+    )

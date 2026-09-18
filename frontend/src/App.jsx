@@ -1,205 +1,216 @@
-import { useEffect, useMemo, useState } from 'react';
-import CompareMode from './components/CompareMode.jsx';
-import MapView from './components/MapView.jsx';
-import PreferenceProfiles from './components/PreferenceProfiles.jsx';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { Archive, Map as MapIcon, Scale, SlidersHorizontal } from 'lucide-react';
 import Profile from './components/Profile.jsx';
-import SavedProfiles from './components/SavedProfiles.jsx';
 import TopBar from './components/TopBar.jsx';
 import { useNeighborhood } from './hooks/useNeighborhood.js';
-import { buildAnalyzePayload } from './utils/preferenceProfiles.js';
+import { getHealth } from './utils/api.js';
+import { buildAnalyzePayloadForLens } from './utils/preferenceProfiles.js';
+
+const MapView = lazy(() => import('./components/MapView.jsx'));
+const PreferenceProfiles = lazy(() => import('./components/PreferenceProfiles.jsx'));
+const SavedProfiles = lazy(() => import('./components/SavedProfiles.jsx'));
+const CompareMode = lazy(() => import('./components/CompareMode.jsx'));
 
 export default function App() {
-  const [selectedPlace, setSelectedPlace] = useState(null);
-  const [activeWorkspace, setActiveWorkspace] = useState(null);
+  const [workspace, setWorkspace] = useState(null);
+  const [setupHealth, setSetupHealth] = useState(null);
+  const [setupHealthError, setSetupHealthError] = useState('');
+  const neighborhood = useNeighborhood();
   const {
+    activeLens,
     analyze,
     data,
     error,
-    loading,
-    retry,
-    refreshCurrentProfile,
-    savedProfiles,
-    savedProfileId,
-    saveError,
-    refreshError,
-    isSaving,
-    isRefreshing,
+    errors,
     generatedAt,
+    isRefreshing,
+    isSaving,
+    isSavingPreferenceProfile,
+    lensIsStale,
+    loading,
     preferenceProfiles,
+    refreshCurrentProfile,
+    savedProfileId,
+    savedProfiles,
+    selectPlace,
+    selectedPlace,
     selectedPreferenceProfileId,
     setSelectedPreferenceProfileId,
-    preferenceProfileError,
-    isSavingPreferenceProfile,
-    loadPreferenceProfiles,
-    createPreferenceProfile,
-    updatePreferenceProfile,
-    deletePreferenceProfile,
-    setDefaultPreferenceProfile,
-    loadSavedProfiles,
-    saveCurrentProfile,
-    openSavedProfile,
-    deleteSavedProfile,
-    clearCurrentProfile,
-  } = useNeighborhood();
+  } = neighborhood;
 
   const selectedPreferenceProfile = useMemo(
     () => preferenceProfiles.find((profile) => profile.id === selectedPreferenceProfileId) || null,
     [preferenceProfiles, selectedPreferenceProfileId],
   );
-
   const analyzePayload = useMemo(
-    () => buildAnalyzePayload(selectedPlace, selectedPreferenceProfile),
-    [selectedPlace, selectedPreferenceProfile],
+    () => buildAnalyzePayloadForLens(selectedPlace, activeLens, preferenceProfiles),
+    [activeLens, preferenceProfiles, selectedPlace],
   );
 
   useEffect(() => {
-    loadSavedProfiles().catch(() => null);
-    loadPreferenceProfiles().catch(() => null);
+    neighborhood.loadSavedProfiles();
+    neighborhood.loadPreferenceProfiles();
+    if (import.meta.env.DEV) {
+      getHealth()
+        .then(setSetupHealth)
+        .catch((healthError) => setSetupHealthError(healthError.message || 'Backend health check failed'));
+    }
   }, []);
 
-  function handleSelectPlace(place) {
-    setSelectedPlace(place);
-    clearCurrentProfile();
+  async function openSaved(id) {
+    const saved = await neighborhood.openSavedProfile(id);
+    if (saved) setWorkspace(null);
   }
 
-  async function handleOpenSavedProfile(profileId) {
-    const saved = await openSavedProfile(profileId);
-    if (saved?.response?.place) {
-      setSelectedPlace(saved.response.place);
-    }
-  }
-
-  async function handleDeleteSavedProfile(profileId) {
-    const deletingActiveProfile = savedProfileId === profileId;
-    await deleteSavedProfile(profileId);
-    if (deletingActiveProfile) {
-      setSelectedPlace(null);
-    }
-  }
+  const coverageLabel = data?.coverage
+    ? `${labelize(data.coverage.region)} · ${labelize(data.coverage.level)} coverage`
+    : 'GTA-first coverage';
 
   return (
     <main className="app-shell">
+      <TopBar
+        activeLens={activeLens}
+        onProfileClick={() => setWorkspace('profiles')}
+        onSavedReportsClick={() => setWorkspace('saved')}
+        onCompareClick={() => setWorkspace('compare')}
+        onSelectPlace={selectPlace}
+      />
+      {import.meta.env.DEV && (setupHealthError || setupHealth?.status === 'degraded') && (
+        <div className="setup-warning" role="alert">
+          <strong>Local setup needs attention.</strong>
+          <span>{setupHealthError || summarizeHealth(setupHealth)}</span>
+        </div>
+      )}
       <section className="map-stage">
-        <MapView selectedPlace={selectedPlace} />
-        <TopBar
-          activeProfile={selectedPreferenceProfile}
-          preferenceProfileError={preferenceProfileError}
-          onProfileClick={() => setActiveWorkspace('profiles')}
-          onSavedReportsClick={() => setActiveWorkspace('savedReports')}
-          onCompareClick={() => setActiveWorkspace('compare')}
-          onSelectPlace={handleSelectPlace}
-        />
-        {!selectedPlace && !data && !loading && !error && (
+        <Suspense fallback={<div className="map-loading">Loading map…</div>}>
+          <MapView selectedPlace={selectedPlace} />
+        </Suspense>
+
+        <div className="coverage-chip" aria-live="polite">
+          <span aria-hidden="true" />
+          {coverageLabel}
+        </div>
+
+        {!selectedPlace && !data && !loading && (
           <section className="landing-card">
-            <div className="landing-icon">◎</div>
-            <h1>Begin Your Analysis</h1>
-            <p>Select a profile and search a place to start your analysis.</p>
-            <div className="landing-actions">
-              <button type="button" className="primary-button" onClick={() => setActiveWorkspace('profiles')}>
-                Select Profile
-              </button>
-              <button type="button" onClick={() => setActiveWorkspace('savedReports')}>
-                Saved Reports
-              </button>
+            <p className="eyebrow">Toronto neighbourhood field guide</p>
+            <h1>Find a place that fits your actual day.</h1>
+            <p>
+              Search any Canadian address. Toronto gets the deepest local context; the rest of
+              the GTA gets regional rent and access evidence, with limitations shown plainly.
+            </p>
+            <div className="coverage-legend" aria-label="Coverage levels">
+              <span><i className="coverage-dot full" /> Toronto · detailed</span>
+              <span><i className="coverage-dot partial" /> GTA · regional</span>
+              <span><i className="coverage-dot limited" /> Elsewhere · limited</span>
             </div>
+            <button type="button" onClick={() => setWorkspace('profiles')}>
+              <SlidersHorizontal size={18} aria-hidden="true" />
+              Personalize the lens
+            </button>
           </section>
         )}
-        <div className="map-status-chip">
-          <span></span>
-          Market saturation
-          <strong>{selectedPlace?.label || 'San Francisco, CA'}</strong>
-        </div>
-        <PreferenceProfiles
-          open={activeWorkspace === 'profiles'}
-          profiles={preferenceProfiles}
-          selectedProfileId={selectedPreferenceProfileId}
-          onClose={() => setActiveWorkspace(null)}
-          onSelect={setSelectedPreferenceProfileId}
-          onCreate={createPreferenceProfile}
-          onUpdate={updatePreferenceProfile}
-          onDelete={(profileId) => deletePreferenceProfile(profileId).catch(() => null)}
-          onSetDefault={(profileId) => setDefaultPreferenceProfile(profileId).catch(() => null)}
-          error={preferenceProfileError}
-          isSaving={isSavingPreferenceProfile}
-        />
-        <SavedProfiles
-          open={activeWorkspace === 'savedReports'}
-          profiles={savedProfiles}
-          onClose={() => setActiveWorkspace(null)}
-          onRefresh={() => loadSavedProfiles().catch(() => null)}
-          onOpen={(profileId) => {
-            handleOpenSavedProfile(profileId).catch(() => null);
-            setActiveWorkspace(null);
-          }}
-          onDelete={(profileId) => handleDeleteSavedProfile(profileId).catch(() => null)}
-        />
-        {activeWorkspace === 'compare' && (
-          <CompareMode
-            activeProfile={selectedPreferenceProfile}
-            onClose={() => setActiveWorkspace(null)}
-          />
-        )}
+
         {(selectedPlace || data || loading || error) && (
-          <aside className="analysis-panel">
-          {selectedPlace && (
-            <div className="selected-place-card">
-              <p className="eyebrow">Selected place</p>
-              <h1>{selectedPlace.label}</h1>
-              <p>{selectedPreferenceProfile ? `Analyzing for ${selectedPreferenceProfile.name}.` : 'Running a generic neighborhood check.'}</p>
-              <button className="primary-button" type="button" disabled={loading} onClick={() => analyzePayload && analyze(analyzePayload)}>
-                {loading ? 'Analyzing...' : 'Analyze neighborhood'}
-              </button>
-            </div>
-          )}
-          {loading && <LoadingState />}
-          {error && (
-            <div className="panel-error" role="alert">
-              <strong>Analysis could not finish.</strong>
-              <p>{error}</p>
-              <button type="button" onClick={retry}>Retry</button>
-            </div>
-          )}
-          {!loading && !error && !data && (
-            <div className="empty-profile-state">
-              <strong>{selectedPlace ? 'Ready to analyze.' : 'Choose a place to begin.'}</strong>
-              <p>
-                {selectedPlace
-                  ? 'The profile will show fit, confidence, caveats, source statuses, and neighborhood context.'
-                  : 'Select a saved lifestyle profile or keep Generic active, then search for an address or neighborhood.'}
-              </p>
-            </div>
-          )}
-          {data && (
-            <Profile
-              response={data}
-              activePreferenceProfile={selectedPreferenceProfile}
-              savedProfileId={savedProfileId}
-              saveError={saveError}
-              isSaving={isSaving}
-              generatedAt={generatedAt}
-              isRefreshing={isRefreshing}
-              refreshError={refreshError}
-              onRefresh={refreshCurrentProfile}
-              onSave={() => saveCurrentProfile(data).catch(() => null)}
-            />
-          )}
+          <aside className="analysis-sheet" aria-label="Neighbourhood analysis">
+            {selectedPlace && !data && !loading && !error && (
+              <section className="selected-place-card">
+                <div>
+                  <p className="eyebrow">Ready to check</p>
+                  <h1>{selectedPlace.label}</h1>
+                  <p>Using {activeLens.profile_name}. Unsupported evidence will stay unavailable.</p>
+                </div>
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!analyzePayload}
+                  onClick={() => analyzePayload && analyze(analyzePayload)}
+                >
+                  Analyze this place
+                </button>
+              </section>
+            )}
+            {loading && <LoadingState />}
+            {error && (
+              <div className="action-error" role="alert">
+                <strong>Analysis could not finish</strong>
+                <p>{error}</p>
+                <button type="button" onClick={neighborhood.retry}>Try again</button>
+              </div>
+            )}
+            {data && (
+              <Profile
+                response={data}
+                lensIsStale={lensIsStale}
+                onSave={neighborhood.saveCurrentProfile}
+                savedProfileId={savedProfileId}
+                saveError={errors.save}
+                isSaving={isSaving}
+                generatedAt={generatedAt}
+                isRefreshing={isRefreshing}
+                refreshError={errors.refresh}
+                onRefresh={refreshCurrentProfile}
+              />
+            )}
           </aside>
         )}
+
+        <Suspense fallback={null}>
+          <PreferenceProfiles
+            open={workspace === 'profiles'}
+            profiles={preferenceProfiles}
+            selectedProfileId={selectedPreferenceProfileId}
+            onClose={() => setWorkspace(null)}
+            onSelect={setSelectedPreferenceProfileId}
+            onCreate={neighborhood.createPreferenceProfile}
+            onUpdate={neighborhood.updatePreferenceProfile}
+            onDelete={neighborhood.deletePreferenceProfile}
+            onSetDefault={neighborhood.setDefaultPreferenceProfile}
+            error={errors.profiles}
+            isSaving={isSavingPreferenceProfile}
+          />
+          <SavedProfiles
+            open={workspace === 'saved'}
+            profiles={savedProfiles}
+            error={errors.saved}
+            onClose={() => setWorkspace(null)}
+            onRefresh={neighborhood.loadSavedProfiles}
+            onOpen={openSaved}
+            onDelete={neighborhood.deleteSavedProfile}
+          />
+          {workspace === 'compare' && (
+            <CompareMode activeProfile={selectedPreferenceProfile} activeLens={activeLens} onClose={() => setWorkspace(null)} />
+          )}
+        </Suspense>
       </section>
+      <nav className="mobile-nav" aria-label="Primary">
+        <button type="button" onClick={() => setWorkspace(null)}><MapIcon size={20} />Map</button>
+        <button type="button" onClick={() => setWorkspace('profiles')}><SlidersHorizontal size={20} />Lens</button>
+        <button type="button" onClick={() => setWorkspace('compare')}><Scale size={20} />Compare</button>
+        <button type="button" onClick={() => setWorkspace('saved')}><Archive size={20} />Saved</button>
+      </nav>
     </main>
   );
+}
+
+function summarizeHealth(health) {
+  const issues = [];
+  if (!health?.mapbox?.configured) issues.push('Mapbox is not configured');
+  if (!health?.snapshot?.ready) issues.push(health?.snapshot?.errors?.[0] || 'snapshot is unavailable');
+  if (!health?.sqlite?.ready) issues.push('SQLite is unavailable');
+  return issues.join(' · ') || 'Run python -m backend.doctor for details.';
 }
 
 function LoadingState() {
   return (
     <div className="loading-state" aria-live="polite">
-      <strong>Checking available signals...</strong>
-      <ul>
-        <li>Resolving place context</li>
-        <li>Checking demographic context</li>
-        <li>Reviewing access and affordability signals</li>
-        <li>Preparing confidence and fit explanation</li>
-      </ul>
+      <div className="loading-mark" aria-hidden="true" />
+      <strong>Reading the neighbourhood</strong>
+      <p>Checking access, rent context, local open data, and source freshness.</p>
     </div>
   );
+}
+
+function labelize(value = '') {
+  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

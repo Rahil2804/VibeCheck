@@ -11,17 +11,20 @@ import {
 import ComparePlaceSearch from './ComparePlaceSearch.jsx';
 import CompareResultCard from './CompareResultCard.jsx';
 import CompareSummary from './CompareSummary.jsx';
+import { useDialogFocus } from '../hooks/useDialogFocus.js';
 
 const INITIAL_SLOTS = [createCompareSlot('compare-1'), createCompareSlot('compare-2')];
 
-export default function CompareMode({ activeProfile, onClose }) {
+export default function CompareMode({ activeProfile, activeLens, onClose }) {
   const [slots, setSlots] = useState(INITIAL_SLOTS);
   const [nextSlotNumber, setNextSlotNumber] = useState(3);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const selectedCount = slots.filter((slot) => slot.place).length;
   const isAnalyzing = slots.some((slot) => slot.status === 'loading');
   const ready = canAnalyzeCompare(slots) && !isAnalyzing;
-  const lensLabel = activeProfile?.name || 'Generic neighborhood check';
+  const lensLabel = activeLens?.profile_name || activeProfile?.name || 'Generic';
+  const dialogRef = useDialogFocus(true, onClose);
+  const compareProfile = activeProfile || lensAsProfile(activeLens);
   const successfulCount = slots.filter((slot) => slot.status === 'success').length;
 
   const helperText = useMemo(() => {
@@ -58,7 +61,7 @@ export default function CompareMode({ activeProfile, onClose }) {
     if (!slot.place) return null;
     updateSlot(slot.id, { status: 'loading', response: null, error: '' });
     try {
-      const response = await analyzeNeighborhood(buildComparePayload(slot.place, activeProfile));
+      const response = await analyzeNeighborhood(buildComparePayload(slot.place, compareProfile));
       updateSlot(slot.id, { status: 'success', response, error: '' });
       return response;
     } catch (err) {
@@ -84,11 +87,11 @@ export default function CompareMode({ activeProfile, onClose }) {
   }
 
   return (
-    <section className="compare-workspace" aria-label="Compare places">
+    <section className="compare-workspace" role="dialog" aria-modal="true" aria-labelledby="compare-title" ref={dialogRef}>
       <header className="compare-header">
         <div>
           <p className="eyebrow">Compare mode</p>
-          <h1>Compare places</h1>
+          <h1 id="compare-title">Compare places</h1>
           <p>{helperText}</p>
         </div>
         <div className="compare-header-actions">
@@ -129,4 +132,14 @@ export default function CompareMode({ activeProfile, onClose }) {
       </div>
     </section>
   );
+}
+
+function lensAsProfile(lens) {
+  if (!lens || lens.mode === 'generic' || lens.mode === 'legacy') return null;
+  return {
+    id: lens.profile_id,
+    name: lens.profile_name,
+    generic_mode: false,
+    ...lens.preferences,
+  };
 }

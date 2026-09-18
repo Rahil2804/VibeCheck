@@ -1,14 +1,26 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from time import monotonic
 from typing import Any
 
 import httpx
 
+from backend.source_cache import (
+    get_cached_source,
+    get_stale_cached_source,
+    set_cached_source,
+)
 from backend.sources.common import SourceContext, SourceResult
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_URLS = (
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+)
+OVERPASS_USER_AGENT = "VibeCheck/1.0 (+https://github.com/Rahil2804/VibeCheck)"
 ACCESS_RADIUS_METERS = 1200
 OVERPASS_TIMEOUT_SECONDS = 6
+ENDPOINT_COOLDOWN_SECONDS = 60
 LOW_SCORE = 30
+_UNHEALTHY_UNTIL: dict[str, float] = {}
 
 CATEGORY_KEYS = (
     "groceries",
@@ -26,28 +38,101 @@ CATEGORY_KEYS = (
 async def fetch_access_context(
     context: SourceContext,
     client: httpx.AsyncClient | None = None,
+    *,
+    use_cache: bool = True,
 ) -> SourceResult:
     coordinates = context.place.coordinates
     if coordinates is None:
-        return SourceResult(data={}, message="Access lookup needs resolved coordinates.")
+        return SourceResult(
+            data={}, message="Access lookup needs resolved coordinates."
+        )
+
+    cache_key = (
+        f"osm:access:{coordinates.lat:.4f}:{coordinates.lng:.4f}:{ACCESS_RADIUS_METERS}"
+    )
+    cached = get_cached_source(cache_key) if client is None and use_cache else None
+    if cached is not None:
+        return SourceResult(
+            data=cached["data"],
+            message=cached["message"],
+            updated_at=cached["updated_at"],
+            source_url=cached.get("source_url"),
+        )
 
     query = build_overpass_query(lat=coordinates.lat, lng=coordinates.lng)
     should_close = client is None
-    http_client = client or httpx.AsyncClient(timeout=OVERPASS_TIMEOUT_SECONDS + 2)
+    http_client = client or httpx.AsyncClient(
+        timeout=3.5,
+        follow_redirects=True,
+        headers={"User-Agent": OVERPASS_USER_AGENT, "Accept": "application/json"},
+    )
     try:
-        response = await http_client.post(OVERPASS_URL, data={"data": query})
-        response.raise_for_status()
-        data = normalize_access_payload(response.json())
+        now = monotonic()
+        endpoints = tuple(
+            endpoint
+            for endpoint in OVERPASS_URLS
+            if _UNHEALTHY_UNTIL.get(endpoint, 0) <= now
+        )
+        last_error: Exception | None = None
+        data: dict[str, Any] | None = None
+        endpoint_used: str | None = None
+        for endpoint in endpoints:
+            try:
+                response = await http_client.post(endpoint, data={"data": query})
+                response.raise_for_status()
+                data = normalize_access_payload(response.json())
+                endpoint_used = endpoint
+                _UNHEALTHY_UNTIL.pop(endpoint, None)
+                break
+            except (httpx.HTTPError, ValueError) as exc:
+                last_error = exc
+                if client is None and _should_cool_down(exc):
+                    _UNHEALTHY_UNTIL[endpoint] = monotonic() + ENDPOINT_COOLDOWN_SECONDS
+        if data is None:
+            stale = get_stale_cached_source(cache_key, max_stale=timedelta(days=6))
+            if stale is not None and client is None:
+                return SourceResult(
+                    data=stale["data"],
+                    message="Using the last successful OSM access result because live endpoints are unavailable.",
+                    updated_at=stale["updated_at"],
+                    source_url=stale.get("source_url"),
+                    stale=True,
+                )
+            if last_error is not None:
+                raise last_error
+            raise RuntimeError("No Overpass endpoint returned usable data.")
     finally:
         if should_close:
             await http_client.aclose()
 
     checked_at = datetime.now(UTC).replace(microsecond=0).isoformat()
-    return SourceResult(
+    result = SourceResult(
         data=data,
         message=data["summary"],
         updated_at=checked_at,
+        source_url=endpoint_used,
     )
+    if client is None:
+        set_cached_source(
+            cache_key,
+            {
+                "data": data,
+                "message": result.message,
+                "updated_at": checked_at,
+                "source_url": endpoint_used,
+            },
+            ttl=timedelta(hours=24),
+        )
+    return result
+
+
+def _should_cool_down(exc: Exception) -> bool:
+    if isinstance(exc, httpx.TimeoutException):
+        return True
+    if not isinstance(exc, httpx.HTTPStatusError):
+        return False
+    status = exc.response.status_code
+    return status in {406, 429} or status >= 500
 
 
 def build_overpass_query(*, lat: float, lng: float) -> str:
@@ -104,7 +189,6 @@ def normalize_access_payload(payload: dict[str, Any]) -> dict[str, Any]:
     walkability = _weighted_score(
         daily_needs=daily_needs,
         food_social=food_social,
-        transit_access=transit_access,
         parks_outdoors=parks_outdoors,
         community_count=categories["community"] + categories["libraries"],
     )
@@ -173,7 +257,9 @@ def _score_daily_needs(categories: dict[str, int]) -> int:
 
 
 def _score_food_social(categories: dict[str, int]) -> int:
-    weighted_count = categories["restaurants"] + categories["cafes"] + categories["bars"]
+    weighted_count = (
+        categories["restaurants"] + categories["cafes"] + categories["bars"]
+    )
     return _score_count(weighted_count, useful=4, dense=20)
 
 
@@ -191,16 +277,14 @@ def _weighted_score(
     *,
     daily_needs: int,
     food_social: int,
-    transit_access: int,
     parks_outdoors: int,
     community_count: int,
 ) -> int:
     score = int(
-        daily_needs * 0.35
-        + food_social * 0.25
-        + transit_access * 0.2
-        + parks_outdoors * 0.15
-        + min(8, community_count * 2)
+        daily_needs * 0.45
+        + food_social * 0.30
+        + parks_outdoors * 0.20
+        + min(5, community_count)
     )
     return max(LOW_SCORE, _clamp(score))
 
@@ -209,7 +293,9 @@ def _summary(categories: dict[str, int]) -> str:
     found = [label for label, count in categories.items() if count > 0]
     if not found:
         return "Public POI query returned no nearby everyday destination signals."
-    return f"Nearby public POI signals found {', '.join(found)} within the access radius."
+    return (
+        f"Nearby public POI signals found {', '.join(found)} within the access radius."
+    )
 
 
 def _clamp(score: int) -> int:

@@ -1,4 +1,5 @@
 from backend.models import Place
+from backend.geography import resolve_geography
 from backend.sources.common import SourceContext, SourceResult
 
 GTA_MUNICIPALITIES = {
@@ -34,7 +35,8 @@ async def fetch_local_context(context: SourceContext) -> SourceResult:
             message="Local open-data lookup needs resolved coordinates.",
         )
 
-    if is_toronto_place(place):
+    geography = context.geography or resolve_geography(place)
+    if geography.is_toronto:
         from backend.sources.ontario.toronto import fetch_toronto_context
 
         return await fetch_toronto_context(context)
@@ -54,18 +56,19 @@ async def fetch_local_context(context: SourceContext) -> SourceResult:
 
 
 def is_ontario_place(place: Place) -> bool:
+    geography = resolve_geography(place)
+    if geography.province and geography.province.casefold() in {"on", "ontario"}:
+        return True
     values = _place_tokens(place)
     return any(value in {"on", "ontario"} for value in values)
 
 
 def is_toronto_place(place: Place) -> bool:
-    values = _place_tokens(place)
-    return "toronto" in values
+    return resolve_geography(place).is_toronto
 
 
 def is_gta_place(place: Place) -> bool:
-    text = _place_text(place)
-    return any(municipality in text for municipality in GTA_MUNICIPALITIES)
+    return resolve_geography(place).is_gta
 
 
 def _place_text(place: Place) -> str:

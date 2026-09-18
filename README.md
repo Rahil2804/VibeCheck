@@ -1,158 +1,134 @@
 # VibeCheck
 
-VibeCheck is a map-first neighborhood-fit app for evaluating whether a place matches a user's stated lifestyle preferences. Phase 1 is complete as a local single-neighborhood MVP.
+VibeCheck is a GTA-first neighbourhood field guide that compares a place with a person’s stated lifestyle preferences. It is a local portfolio MVP: no accounts, cloud sync, live tracking, crime scoring, or demographic recommendations.
 
-The app opens on a Mapbox 3D map. A user searches for an address or place, selects an autocomplete result, the map flies to that point, and the profile panel renders fit scoring, confidence, caveats, and source statuses.
+The central product rule is simple: missing evidence stays unavailable. It is never converted into a neutral-looking score.
 
-## Current Scope
+![Desktop landing state](docs/screenshots/gta-landing-desktop.png)
+![Mobile field guide](docs/screenshots/gta-mobile-landing.png)
 
-- React + Vite frontend with Mapbox GL 3D map, autocomplete search, marker, and 0.5 mile radius.
-- FastAPI backend with `GET /health` and `POST /analyze`.
-- Pydantic request/response models for the analyze contract.
-- Optional OpenAI Structured Outputs synthesis with deterministic fallback.
-- Visible AI synthesis status showing whether OpenAI was used, skipped, or fallback was used.
-- Explicit SQLite-backed saved profiles with local reopen/delete controls.
-- Typed provenance metadata and Source support UI showing which normalized sources support major claims.
-- Dedicated compare mode for 2-4 ad hoc places using the active preference profile or Generic lens.
-- Source freshness labels and single-place refresh controls for current and saved reports.
-- Ontario-first local open-data source depth with Toronto development and parks/amenity signals.
-- GTA/Ontario-first backend score depth that uses Toronto local parks and amenity signals conservatively without changing the current UI.
-- No-new-key Daily Needs Access scoring from bounded public OpenStreetMap/Overpass POI queries.
-- Source status handling for Mapbox, Census, housing, Reddit, and access data.
-- Partial results when sources fail, time out, or return no MVP data.
-- Rule-based confidence and lifestyle fit scoring.
-- Neutral questionnaire that avoids protected-class and protected-class-proxy inputs.
-- Loading, empty, API-error, low-confidence, missing-token, and success states.
+## Included evidence
 
-## Architecture
+| Signal | Coverage | Evidence |
+|---|---|---|
+| Scheduled transit | GTA core systems | Bundled regular-weekday GTFS for TTC, GO, UP Express, MiWay, Brampton Transit, YRT, and Durham Region Transit |
+| Rent benchmark | GTA census subdivisions | CMHC 2025 purpose-built apartment rents by studio, 1-bedroom, 2-bedroom, and 3-bedroom-plus reporting geography |
+| Cycling | Toronto | City cycling-network geometry and Bike Share station locations; live availability is not stored or scored |
+| Everyday access | Where OSM responds | Nearby groceries, pharmacies, community amenities, dining, parks, and transit-stop fallback |
+| Local context | Toronto | 2021 Toronto Neighbourhood Profiles and City parks/open data |
+| Census context | GTA, with deeper Toronto detail | Bundled Statistics Canada 2021 census-subdivision boundaries/context and Toronto 158-neighbourhood profiles |
 
-```text
-frontend/ React + Vite
-  - Mapbox search and 3D map
-  - neutral lifestyle questionnaire
-  - profile, confidence, and source status panels
-        |
-        | POST /analyze
-        v
-backend/ FastAPI
-  - request validation
-  - source orchestration with per-source statuses
-  - confidence and fit scoring
-  - optional OpenAI profile synthesis
+Toronto has the deepest coverage. The rest of the GTA has scheduled transit, unit-matched rent, bundled Census context, and OSM context where available. Outside the GTA remains a visibly limited Mapbox/OSM analysis; Statistics Canada's retired Census Profile endpoint is not part of the critical GTA runtime path. Every source status can carry its edition, geographic scope, official URL, update date, stale state, and exact evidence fields.
+
+The checked-in normalized snapshot is under `backend/snapshots/`, is below 50 MB, and has a manifest containing source URLs, retrieval dates, input checksums, licences, feed validity, artifact checksum, and snapshot ID. Saved reports retain the exact `analysis_version`, `snapshot_id`, and preference lens used when they were created.
+
+Toronto neighbourhood population density is derived reproducibly from the official 2021 profile population estimate and official neighbourhood boundary area. Municipal GTA density comes directly from the Statistics Canada 2021 Census Profile.
+
+## Scoring
+
+- Scheduled transit: proximity 25%, peak scheduled frequency 40%, route diversity 25%, and rapid/regional access 10%. Frequency caps at 20 departures/hour and diversity at six routes.
+- Toronto cycling: protected-network length within 1 km 50%, all cycling-network length within 1 km 25%, and Bike Share stations within 800 m 25%.
+- Walkability: everyday destinations, parks, dining/activity, and community amenities. Transit is deliberately excluded to prevent double-counting.
+- Rent: only the selected unit size’s CMHC purpose-built benchmark can affect a rent ceiling or rent-pressure fit. A different bedroom size and Toronto’s historical 2021 shelter-cost field are never substituted.
+- Fit: top priorities use up to ±15, important signals up to ±6 each, and failed positive non-negotiables up to −15. Missing evidence is skipped.
+
+Driving and quiet preferences remain stored in a local lens but are labelled unscored until defensible evidence exists. OpenAI is optional and can improve prose only; metrics, availability, fit, coverage, and provenance are deterministic. AI runs only when at least two non-Mapbox evidence checks are usable. Each accepted sentence cites evidence-check IDs; unsupported numbers and prohibited safety, protected-class, noise, school, sentiment, and trajectory claims are rejected.
+
+## Local setup
+
+Requirements: Python 3.12+, Node 22+, and a public Mapbox token.
+
+Backend configuration belongs in the root `.env`:
+
+```dotenv
+MAPBOX_TOKEN=
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+SOURCE_TIMEOUT_SECONDS=8
+SQLITE_PATH=data/vibecheck.db
 ```
 
-## Local Setup
+`OPENAI_API_KEY` is optional. Do not put any real token in examples, fixtures, screenshots, logs, or Git. If a key has been exposed, revoke it before running this project again.
 
-Backend:
+Frontend configuration belongs in `frontend/.env`:
+
+```dotenv
+VITE_MAPBOX_TOKEN=
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Allow both `http://127.0.0.1:5173/*` and `http://localhost:5173/*` in the Mapbox public-token URL restrictions. Vite reads environment variables only when it starts, so restart it after changes.
+
+Install and run the backend from the repository root:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 Copy-Item .env.example .env
-```
-
-Frontend:
-
-```powershell
-Set-Location frontend
-npm install
-Copy-Item ..\.env.example .env
-```
-
-Set these in `frontend/.env`:
-
-```bash
-VITE_MAPBOX_TOKEN=
-VITE_API_BASE_URL=http://127.0.0.1:8000
-```
-
-Set backend keys in root `.env` when needed:
-
-```bash
-MAPBOX_TOKEN=
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4o-mini
-SQLITE_PATH=data/vibecheck.db
-```
-
-The backend loads the root `.env` automatically on startup. OpenAI is optional. If `OPENAI_API_KEY` is absent or synthesis fails, the backend returns the deterministic profile.
-
-Saved profiles are stored locally in SQLite at `data/vibecheck.db` by default. The `data/` directory is ignored by git and should not contain API keys or raw provider credentials.
-
-## Run Locally
-
-Backend:
-
-```powershell
+.\.venv\Scripts\python.exe -m backend.doctor
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload
 ```
 
-Frontend:
+`backend.doctor` performs local, secret-free checks only. Remote diagnostics are explicit:
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.doctor --live-sources
+.\.venv\Scripts\python.exe -m backend.doctor --live-openai
+```
+
+The OpenAI option makes a small paid request. Neither live option prints tokens or raw provider payloads.
+
+Run the frontend in a second terminal:
 
 ```powershell
 Set-Location frontend
+npm.cmd install
+Copy-Item .env.example .env
 npm.cmd run dev
 ```
 
-Open:
+Open `http://127.0.0.1:5173`. The Mapbox terrain-cutoff console warning is non-fatal. If the basemap is blank, hard-refresh, check browser privacy extensions, confirm the frontend token is present, and verify its localhost URL restrictions.
 
-```text
-http://127.0.0.1:5173
-```
+## Refreshing the bundled snapshot
 
-If Vite reports that 5173 is already in use, open the fallback URL it prints, such as `http://127.0.0.1:5174`.
-
-Health check:
+Run this only when updating checked-in official data:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
+.\.venv\Scripts\python.exe -m scripts.refresh_gta_snapshot
+.\.venv\Scripts\python.exe -m backend.snapshot
 ```
 
-Analyze example:
+The refresh stages files directly beside the final artifact so Windows permissions inherit from `backend/snapshots/`. It validates required agencies/tables, SQLite integrity, source normalization, and the 50 MB limit, then atomically replaces the prior database and manifest. A failed refresh leaves the last valid snapshot intact. The current schema includes 25 official GTA census subdivisions and all 158 Toronto neighbourhood profiles.
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/analyze `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body '{"query":"East Austin","preferences":{"car_reliance":"no_car"}}'
-```
+Input sources and licence links are recorded in `backend/snapshots/manifest.json`. The relevant publishers are Statistics Canada, Metrolinx, TTC/City of Toronto, MiWay/City of Mississauga, Brampton Transit, YRT/York Region, Durham Region Transit, CMHC, and Bike Share Toronto.
 
 ## Verification
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider
-.\.venv\Scripts\python.exe -m ruff check backend tests
+.\.venv\Scripts\ruff.exe check backend scripts tests
+.\.venv\Scripts\python.exe -m scripts.check_secrets
+.\.venv\Scripts\python.exe -m backend.snapshot
+.\.venv\Scripts\python.exe -m pytest -q
+
 Set-Location frontend
+npm.cmd test
 npm.cmd run build
+npm.cmd run check:bundle
+npx.cmd playwright install chromium
+npm.cmd run test:e2e
 ```
 
-Backend tests intentionally blank live API keys at pytest startup so they do not depend on a developer's local `.env` or call external services unexpectedly.
+CI runs Ruff, secret scanning, snapshot schema/checksum validation, pytest, Node/Vitest tests, the Vite production build, the initial-shell bundle budget, Playwright screenshots, and axe accessibility checks.
 
-## Data And Confidence Caveats
+## Deliberate limitations
 
-- Phase 1 source adapters are intentionally conservative and may return empty data without configured provider keys or deeper open-data coverage.
-- Mapbox search supports US and Canada in the frontend and backend resolver.
-- Daily Needs Access uses public OpenStreetMap contributor data through bounded Overpass-style POI queries; results may be incomplete or temporarily unavailable if the public endpoint is slow or rate-limited.
-- Access POI data is derived from OpenStreetMap contributors under the Open Database License.
-- Reddit is treated as anecdotal signal only.
-- The app does not make safety/crime claims in the MVP.
-- Confidence and source statuses are part of the response so missing data stays visible.
+- Static scheduled service is included; real-time arrivals, live Bike Share availability, and commute routing are not.
+- Some CMHC rows represent official grouped reporting zones or regions rather than a single municipality; the displayed scope always says so.
+- Recently expired or missing GTFS feeds are marked stale and fall back to clearly labelled OSM stop evidence when available.
+- Toronto’s 2021 renter shelter cost is historical household context, not a current asking-rent proxy.
+- Live listings, Reddit, noise claims, permits/trajectory, flood risk, crime/safety, schools, accounts, deployment, and cloud sync are out of scope.
+- OSM proximity is not a route or travel-time estimate and may be incomplete.
 
-## Fair Housing Guardrails
+## Fair-housing guardrails
 
-- Fit scoring uses only neutral lifestyle preferences and non-protected neighborhood signals.
-- The questionnaire does not ask about family status, children, race, religion, disability, national origin, sex, or equivalent proxies.
-- Demographic context is modeled for display only and is covered by tests to prevent it from influencing fit scoring.
-- Results are framed as matches to selected lifestyle preferences, not judgments about whether a neighborhood is good or bad for protected groups.
-
-## Resume Bullets
-
-- Built a map-first neighborhood intelligence MVP with React, Vite, Mapbox GL, and FastAPI.
-- Implemented source-aware partial-result orchestration with confidence scoring and graceful degradation.
-- Added neutral lifestyle fit scoring with tests guarding against demographic/protected-class inputs.
-- Integrated optional OpenAI Structured Outputs synthesis with Pydantic validation and deterministic fallback.
-- Delivered local full-stack setup, API tests, linting, frontend build verification, and clear data caveats.
-
-## Phase 2 Status
-
-Phase 2A added explicit local saved neighborhood reports. Phase 2B added reusable local preference profiles and then corrected the UI so profiles work as an app-level analysis lens selected before address search. Phase 2C adds typed provenance and compact source-support UI so major claims can be traced to normalized source signals. Phase 2D adds a dedicated compare mode for 2-4 ad hoc places using the active preference profile or Generic lens. Phase 2E adds source freshness labels and single-place refresh controls for current and saved reports. Phase 2F adds Ontario-first local open-data depth with Toronto development and parks/amenity signals, while unsupported Ontario municipalities degrade honestly. Phase 2G keeps the UI unchanged while bridging Toronto local parks/amenity data into existing backend score and fit logic. Phase 2H adds no-new-key Daily Needs Access scoring from bounded public OpenStreetMap/Overpass POI queries. The next slices should focus on expanding Durham/Pickering coverage, preference scoring depth, and share/export flows.
+Fit uses only explicit lifestyle preferences and neutral place evidence. Age, income, race, religion, disability, family status, national origin, sex, and proxies never affect fit. Census demographics are not used to recommend a neighbourhood for a kind of person.

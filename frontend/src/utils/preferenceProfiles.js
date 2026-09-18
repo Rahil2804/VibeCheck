@@ -9,6 +9,7 @@ export const EMPTY_PROFILE_FORM = {
   commute_anchor_lat: '',
   commute_anchor_lng: '',
   max_monthly_rent: '',
+  rental_unit_size: '',
   must_haves: [],
   deal_breakers: [],
   notes: '',
@@ -53,6 +54,21 @@ export function buildAnalyzePayload(place, activeProfile) {
   };
 }
 
+export function buildAnalyzePayloadForLens(place, lens, profiles = []) {
+  if (!place) return null;
+  const basePayload = { query: place.label, coordinates: place.coordinates };
+  const liveProfile = profiles.find((profile) => profile.id === lens?.profile_id);
+  if (liveProfile) return buildAnalyzePayload(place, liveProfile);
+  if (!lens || lens.mode === 'generic' || lens.mode === 'legacy') {
+    return { ...basePayload, preferences: {}, generic_mode: true };
+  }
+  return {
+    ...basePayload,
+    preferences: lens.preferences || {},
+    generic_mode: false,
+  };
+}
+
 export function profileToForm(profile) {
   if (!profile) return { ...EMPTY_PROFILE_FORM, must_haves: [], deal_breakers: [] };
   return {
@@ -66,6 +82,7 @@ export function profileToForm(profile) {
     commute_anchor_lat: numberToInput(profile.commute_anchor?.lat),
     commute_anchor_lng: numberToInput(profile.commute_anchor?.lng),
     max_monthly_rent: numberToInput(profile.max_monthly_rent),
+    rental_unit_size: profile.rental_unit_size || '',
     must_haves: profile.must_haves || [],
     deal_breakers: profile.deal_breakers || [],
     notes: profile.notes || '',
@@ -85,6 +102,7 @@ export function formToPreferenceProfilePayload(form, { mode = 'create' } = {}) {
   copyOptional(payload, 'energy_preference', form.energy_preference, includeClears);
   copyOptional(payload, 'top_priority', form.top_priority, includeClears);
   copyOptional(payload, 'budget_sensitivity', form.budget_sensitivity, includeClears);
+  copyOptional(payload, 'rental_unit_size', form.rental_unit_size, includeClears);
 
   const commuteLabel = form.commute_anchor_label.trim();
   const commuteLat = form.commute_anchor_lat === '' ? null : Number(form.commute_anchor_lat);

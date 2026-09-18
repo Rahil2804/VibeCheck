@@ -4,6 +4,7 @@ import pytest
 
 from backend.models import (
     AnalyzeRequest,
+    NarrativeCitation,
     NeighborhoodProfile,
     Preferences,
     SourceName,
@@ -17,10 +18,27 @@ from backend.models import (
 )
 from backend.pipeline import analyze_neighborhood
 from backend.sources.common import SourceContext, SourceResult
+from backend.synthesizer import SynthesizedProfileResult
 
 
 async def _success_adapter():
-    return {"value": 1}
+    return {
+        "value": 1,
+        "population_density": 1000,
+        "affordability": 55,
+        "walkability": 70,
+        "score": 65,
+    }
+
+
+async def _access_adapter():
+    return {
+        "walkability": 80,
+        "transit_access": 75,
+        "daily_needs": 72,
+        "food_social": 68,
+        "parks_outdoors": 60,
+    }
 
 
 async def _error_adapter():
@@ -81,10 +99,15 @@ async def test_pipeline_uses_source_result_message_and_updated_at():
     )
 
     local_status = next(
-        status for status in response.source_statuses if status.source == SourceName.LOCAL
+        status
+        for status in response.source_statuses
+        if status.source == SourceName.LOCAL
     )
     assert local_status.status == SourceStatusCode.EMPTY
-    assert local_status.message == "No local open-data adapter is configured for this region."
+    assert (
+        local_status.message
+        == "No local open-data adapter is configured for this region."
+    )
     assert local_status.updated_at == "2026-05-08T00:00:00+00:00"
 
 
@@ -104,7 +127,7 @@ async def test_pipeline_keeps_partial_results_when_source_fails():
     statuses = {status.source: status.status for status in response.source_statuses}
     assert statuses[SourceName.CENSUS] == SourceStatusCode.SUCCESS
     assert statuses[SourceName.HOUSING] == SourceStatusCode.ERROR
-    assert response.confidence.level == "medium"
+    assert response.confidence.level == "low"
     assert response.place.label == "East Austin"
 
 
@@ -123,7 +146,9 @@ async def test_pipeline_converts_source_timeout_to_status():
 
     statuses = {status.source: status.status for status in response.source_statuses}
     assert statuses[SourceName.CENSUS] == SourceStatusCode.ERROR
-    assert any("timed out" in status.message.lower() for status in response.source_statuses)
+    assert any(
+        "timed out" in status.message.lower() for status in response.source_statuses
+    )
 
 
 def _synthetic_profile() -> NeighborhoodProfile:
@@ -160,7 +185,7 @@ async def test_pipeline_uses_synthesized_profile_when_available():
             SourceName.CENSUS: _success_adapter,
             SourceName.HOUSING: _success_adapter,
             SourceName.REDDIT: _success_adapter,
-            SourceName.ACCESS: _success_adapter,
+            SourceName.ACCESS: _access_adapter,
         },
         source_timeout_seconds=1,
         profile_synthesizer=synthesizer,
@@ -210,7 +235,48 @@ async def test_pipeline_reports_synthesis_used_when_synthesizer_returns_profile(
 
     assert response.synthesis.status == SynthesisStatusCode.USED
     assert response.synthesis.model is not None
-    assert "OpenAI" in response.synthesis.message
+    assert "AI narrative" in response.synthesis.message
+
+
+@pytest.mark.asyncio
+async def test_pipeline_replaces_rejected_ai_claims_with_deterministic_copy():
+    async def partially_grounded(**_kwargs):
+        return SynthesizedProfileResult(
+            profile=NeighborhoodProfile(
+                overview="Access evidence is available.",
+                vibe_scores=VibeScores(),
+                who_lives_here=WhoLivesHere(),
+                honest_pros=[],
+                honest_cons=["Some evidence is unavailable."],
+                narrative_citations=[
+                    NarrativeCitation(
+                        section="overview", evidence_check_ids=["access"]
+                    ),
+                    NarrativeCitation(
+                        section="con", item_index=0, evidence_check_ids=["census"]
+                    ),
+                ],
+            ),
+            accepted_claim_count=2,
+            rejected_claim_count=1,
+            duration_ms=5,
+            rejected_sections=("pro",),
+        )
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="East Austin"),
+        source_fetchers={
+            SourceName.CENSUS: _success_adapter,
+            SourceName.ACCESS: _access_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=partially_grounded,
+    )
+
+    assert response.synthesis.status == SynthesisStatusCode.PARTIAL
+    assert response.synthesis.rejected_claim_count == 1
+    assert response.profile.honest_pros
+    assert response.profile.honest_cons == ["Some evidence is unavailable."]
 
 
 @pytest.mark.asyncio
@@ -252,9 +318,9 @@ async def test_pipeline_reports_synthesis_fallback_when_synthesizer_fails():
     )
 
     assert response.synthesis.status == SynthesisStatusCode.FALLBACK
-    assert "fallback" in response.synthesis.message.lower()
-    assert "RuntimeError" in response.synthesis.message
-    assert "model failed" in response.synthesis.message
+    assert "deterministic" in response.synthesis.message.lower()
+    assert "RuntimeError" not in response.synthesis.message
+    assert "model failed" not in response.synthesis.message
 
 
 @pytest.mark.asyncio
@@ -296,7 +362,9 @@ async def test_pipeline_attaches_backend_provenance_to_synthesized_profile():
 
     assert response.synthesis.status == SynthesisStatusCode.USED
     assert response.profile.provenance.items
-    assert any(item.claim_id == "overview" for item in response.profile.provenance.items)
+    assert any(
+        item.claim_id == "overview" for item in response.profile.provenance.items
+    )
 
 
 @pytest.mark.asyncio
@@ -325,8 +393,7 @@ async def test_pipeline_uses_local_data_for_deterministic_trajectory_and_pros():
         profile_synthesizer=_returns_none,
     )
 
-    assert response.profile.trajectory.direction == TrajectoryDirection.RISING
-    assert "active permit records" in response.profile.trajectory.summary
+    assert response.profile.trajectory is None
     assert any("parks" in item.lower() for item in response.profile.honest_pros)
 
 
@@ -351,12 +418,12 @@ async def test_pipeline_bridges_local_parks_into_visible_scores():
     )
 
     scores = response.profile.vibe_scores
-    assert scores.walkability == 69
-    assert scores.quiet == 59
-    assert scores.social_scene == 58
+    assert scores.walkability is None
+    assert scores.quiet is None
+    assert scores.social_scene is None
     assert scores.parks_outdoors == 88
-    assert scores.transit_access == 50
-    assert scores.affordability == 50
+    assert scores.transit_access is None
+    assert scores.affordability is None
 
 
 @pytest.mark.asyncio
@@ -396,10 +463,118 @@ async def test_pipeline_uses_access_scores_for_visible_scores():
     scores = response.profile.vibe_scores
     assert scores.walkability == 76
     assert scores.transit_access == 67
-    assert scores.parks_outdoors is None
+    assert scores.parks_outdoors == 64
+    assert scores.daily_needs == 72
+    assert scores.dining_activity == 71
 
     access_status = next(
-        status for status in response.source_statuses if status.source == SourceName.ACCESS
+        status
+        for status in response.source_statuses
+        if status.source == SourceName.ACCESS
     )
     assert access_status.status == SourceStatusCode.SUCCESS
     assert access_status.updated_at == "2026-05-10T00:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_skips_ai_and_numeric_fit_when_evidence_is_empty():
+    calls = 0
+
+    async def empty_adapter(_context: SourceContext):
+        return SourceResult(data={}, message="No evidence returned.")
+
+    async def synthesizer(**_kwargs):
+        nonlocal calls
+        calls += 1
+        return _synthetic_profile()
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(
+            query="Thin evidence place",
+            preferences=Preferences(top_priority=TopPriority.TRANSIT_ACCESS),
+        ),
+        source_fetchers={
+            SourceName.CENSUS: empty_adapter,
+            SourceName.HOUSING: empty_adapter,
+            SourceName.ACCESS: empty_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=synthesizer,
+    )
+
+    assert calls == 0
+    assert response.fit is not None
+    assert response.fit.score is None
+    assert response.confidence.level == "none"
+    assert response.synthesis.status == SynthesisStatusCode.SKIPPED
+    assert response.synthesis.reason_code == "insufficient_evidence"
+    assert any(check.id == "ai" for check in response.evidence_checks)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_requires_two_allowlisted_non_mapbox_facts_before_ai():
+    calls = 0
+
+    async def irrelevant_adapter():
+        return {"provider_internal_value": 1}
+
+    async def synthesizer(**_kwargs):
+        nonlocal calls
+        calls += 1
+        return _synthetic_profile()
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="Thin evidence place"),
+        source_fetchers={
+            SourceName.CENSUS: irrelevant_adapter,
+            SourceName.ACCESS: irrelevant_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=synthesizer,
+    )
+
+    assert calls == 0
+    assert response.synthesis.reason_code == "insufficient_evidence"
+    assert response.synthesis.evidence_count == 0
+
+
+@pytest.mark.asyncio
+async def test_unreadable_snapshot_produces_one_actionable_setup_check(monkeypatch):
+    monkeypatch.setattr(
+        "backend.pipeline.snapshot_health",
+        lambda: {
+            "ready": False,
+            "stale": True,
+            "errors": ["Snapshot database is not readable by the backend process."],
+        },
+    )
+    monkeypatch.setattr(
+        "backend.pipeline.DEFAULT_SOURCE_FETCHERS",
+        {
+            SourceName.HOUSING: _success_adapter,
+            SourceName.TRANSIT: _success_adapter,
+            SourceName.CYCLING: _success_adapter,
+        },
+    )
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(query="Toronto"),
+        source_timeout_seconds=1,
+        profile_synthesizer=_returns_none,
+    )
+
+    snapshot_checks = [
+        check for check in response.evidence_checks if check.id == "snapshot"
+    ]
+    assert len(snapshot_checks) == 1
+    assert snapshot_checks[0].status == "error"
+    snapshot_statuses = [
+        status
+        for status in response.source_statuses
+        if status.source in {SourceName.HOUSING, SourceName.TRANSIT, SourceName.CYCLING}
+    ]
+    assert len(snapshot_statuses) == 3
+    assert all(status.status == SourceStatusCode.EMPTY for status in snapshot_statuses)
+    assert not any(
+        "unable to open database" in status.message for status in snapshot_statuses
+    )

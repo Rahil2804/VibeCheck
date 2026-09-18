@@ -4,9 +4,11 @@ import Provenance from './Provenance.jsx';
 const SCORE_LABELS = [
   ['walkability', 'Walkability'],
   ['transit_access', 'Transit'],
-  ['affordability', 'Affordability'],
-  ['quiet', 'Quiet'],
-  ['social_scene', 'Social'],
+  ['daily_needs', 'Daily needs'],
+  ['dining_activity', 'Dining & activity'],
+  ['parks_outdoors', 'Parks'],
+  ['affordability', 'Rent pressure'],
+  ['cycling_access', 'Cycling access'],
 ];
 
 export default function CompareResultCard({ slot, onRetry }) {
@@ -45,7 +47,7 @@ export default function CompareResultCard({ slot, onRetry }) {
       </div>
       {response.fit && (
         <div className="compare-fit">
-          <strong>{response.fit.score}%</strong>
+          <strong>{response.fit.score == null ? 'Unavailable' : `${response.fit.score}%`}</strong>
           <span>{response.fit.label}</span>
           <p>{response.fit.explanation}</p>
         </div>
@@ -54,10 +56,10 @@ export default function CompareResultCard({ slot, onRetry }) {
         {SCORE_LABELS.map(([key, label]) => (
           <div className="compare-score-row" key={key}>
             <span>{label}</span>
-            <div>
-              <i style={{ width: `${Math.max(0, Math.min(100, scores[key] || 0))}%` }}></i>
+            <div className={scores[key] == null ? 'is-unavailable' : ''}>
+              {scores[key] != null && <i style={{ width: `${Math.max(0, Math.min(100, scores[key]))}%` }} />}
             </div>
-            <strong>{scores[key] ?? '-'}</strong>
+            <strong>{scores[key] ?? 'Unavailable'}</strong>
           </div>
         ))}
       </div>

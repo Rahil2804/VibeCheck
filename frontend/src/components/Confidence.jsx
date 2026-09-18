@@ -19,6 +19,11 @@ export default function Confidence({ confidence, statuses }) {
             <span>
               {status.source}
               {status.updated_at && <small>Updated {formatSourceDate(status.updated_at)}</small>}
+              {status.edition && <small>{status.edition}</small>}
+              {status.scope && <small>{status.scope}</small>}
+              {status.stale && <small className="source-stale">Snapshot evidence is stale</small>}
+              <small>{status.message}</small>
+              {status.source_url && <a href={status.source_url} target="_blank" rel="noreferrer">Official source</a>}
             </span>
             <strong>{status.status}</strong>
           </div>
@@ -29,7 +34,9 @@ export default function Confidence({ confidence, statuses }) {
 }
 
 function formatSourceDate(value) {
-  return new Intl.DateTimeFormat('en-US', {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat('en-CA', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',

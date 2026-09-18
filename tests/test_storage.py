@@ -1,7 +1,11 @@
+import json
+import sqlite3
 from pathlib import Path
 from uuid import uuid4
 
 from backend.models import (
+    AnalysisLensMode,
+    AnalysisLensSnapshot,
     AnalyzeRequest,
     AnalyzeResponse,
     Confidence,
@@ -253,6 +257,7 @@ def test_create_preference_profile_persists_expanded_fields():
             car_reliance="no_car",
             commute_anchor={"label": "Union Station", "lat": 43.645, "lng": -79.38},
             max_monthly_rent=2200,
+            rental_unit_size="one_bedroom",
             must_haves=["transit", "groceries"],
             notes="Local only.",
         ),
@@ -267,6 +272,7 @@ def test_create_preference_profile_persists_expanded_fields():
     assert found.commute_anchor is not None
     assert found.commute_anchor.label == "Union Station"
     assert found.must_haves == ["transit", "groceries"]
+    assert found.rental_unit_size == "one_bedroom"
     assert found.notes == "Local only."
 
 
@@ -288,7 +294,9 @@ def test_update_preference_profile_changes_only_supplied_fields():
     db_path = _db_path()
     initialize_database(db_path)
     profile = create_preference_profile(
-        PreferenceProfileCreate(name="Original", car_reliance="no_car", must_haves=["transit"]),
+        PreferenceProfileCreate(
+            name="Original", car_reliance="no_car", must_haves=["transit"]
+        ),
         db_path,
     )
 
@@ -314,6 +322,7 @@ def test_update_preference_profile_can_clear_optional_fields():
             car_reliance="no_car",
             commute_anchor={"label": "Office"},
             max_monthly_rent=2400,
+            rental_unit_size="two_bedroom",
             notes="Local note.",
         ),
         db_path,
@@ -325,6 +334,7 @@ def test_update_preference_profile_can_clear_optional_fields():
             car_reliance=None,
             commute_anchor=None,
             max_monthly_rent=None,
+            rental_unit_size=None,
             notes=None,
         ),
         db_path,
@@ -334,6 +344,7 @@ def test_update_preference_profile_can_clear_optional_fields():
     assert updated.car_reliance is None
     assert updated.commute_anchor is None
     assert updated.max_monthly_rent is None
+    assert updated.rental_unit_size is None
     assert updated.notes is None
 
 
@@ -347,3 +358,65 @@ def test_delete_preference_profile_removes_only_target_profile():
     assert get_preference_profile(first.id, db_path) is None
     assert get_preference_profile(second.id, db_path) is not None
     assert delete_preference_profile(first.id, db_path) is False
+
+
+def test_saved_report_summary_preserves_immutable_lens_and_coverage():
+    db_path = _db_path()
+    response = _response("The Annex").model_copy(
+        update={
+            "analysis_lens": AnalysisLensSnapshot(
+                mode=AnalysisLensMode.SAVED_PROFILE,
+                profile_id="profile-1",
+                profile_name="Transit first",
+                preferences={"top_priority": "transit_access"},
+            )
+        }
+    )
+
+    save_profile(response, db_path)
+    summary = list_saved_profiles(db_path)[0]
+
+    assert summary.analysis_lens.profile_name == "Transit first"
+    assert summary.analysis_lens.preferences.top_priority == "transit_access"
+    assert summary.coverage is not None
+
+
+def test_migration_resolves_overlapping_categories_with_non_negotiable_winning():
+    db_path = _db_path()
+    initialize_database(db_path)
+    timestamp = "2026-09-16T00:00:00+00:00"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO preference_profiles (
+                id, name, car_reliance, energy_preference, top_priority,
+                budget_sensitivity, generic_mode, commute_anchor_json,
+                max_monthly_rent, must_haves_json, deal_breakers_json, notes,
+                is_default, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "legacy",
+                "Legacy overlap",
+                None,
+                None,
+                None,
+                None,
+                0,
+                None,
+                None,
+                json.dumps(["transit", "parks"]),
+                json.dumps(["transit"]),
+                None,
+                1,
+                timestamp,
+                timestamp,
+            ),
+        )
+
+    initialize_database(db_path)
+    migrated = get_preference_profile("legacy", db_path)
+
+    assert migrated is not None
+    assert migrated.must_haves == ["parks"]
+    assert migrated.deal_breakers == ["transit"]

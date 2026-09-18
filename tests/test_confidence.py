@@ -3,7 +3,9 @@ from backend.models import SourceName, SourceStatus, SourceStatusCode
 
 
 def _status(source: SourceName, code: SourceStatusCode) -> SourceStatus:
-    return SourceStatus(source=source, status=code, message=f"{source.value} {code.value}")
+    return SourceStatus(
+        source=source, status=code, message=f"{source.value} {code.value}"
+    )
 
 
 def test_confidence_is_high_with_four_meaningful_sources():
@@ -12,14 +14,15 @@ def test_confidence_is_high_with_four_meaningful_sources():
             _status(SourceName.MAPBOX, SourceStatusCode.SUCCESS),
             _status(SourceName.CENSUS, SourceStatusCode.SUCCESS),
             _status(SourceName.HOUSING, SourceStatusCode.SUCCESS),
-            _status(SourceName.REDDIT, SourceStatusCode.SUCCESS),
             _status(SourceName.ACCESS, SourceStatusCode.SUCCESS),
-        ]
+            _status(SourceName.LOCAL, SourceStatusCode.SUCCESS),
+        ],
+        supported_signals=["a", "b", "c", "d", "e"],
     )
 
     assert confidence.level == "high"
-    assert confidence.available_sources == ["census", "housing", "reddit", "access"]
-    assert confidence.missing_sources == []
+    assert confidence.available_sources == ["census", "housing", "access", "local"]
+    assert confidence.missing_sources == ["transit", "cycling"]
 
 
 def test_confidence_is_medium_with_three_meaningful_sources():
@@ -34,7 +37,7 @@ def test_confidence_is_medium_with_three_meaningful_sources():
     )
 
     assert confidence.level == "medium"
-    assert "reddit" in confidence.missing_sources
+    assert "local" in confidence.missing_sources
 
 
 def test_confidence_is_low_with_one_or_two_meaningful_sources():

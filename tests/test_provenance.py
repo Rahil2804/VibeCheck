@@ -3,7 +3,9 @@ from backend.provenance import build_profile_provenance
 
 
 def _status(source: SourceName, status: SourceStatusCode) -> SourceStatus:
-    return SourceStatus(source=source, status=status, message=f"{source.value} {status.value}.")
+    return SourceStatus(
+        source=source, status=status, message=f"{source.value} {status.value}."
+    )
 
 
 def test_build_profile_provenance_marks_supported_access_and_housing_claims():
@@ -35,8 +37,8 @@ def test_build_profile_provenance_marks_supported_access_and_housing_claims():
     assert items["vibe.walkability"].sources == [SourceName.ACCESS]
     assert items["vibe.walkability"].source_fields == ["access.walkability"]
     assert items["vibe.affordability"].source_fields == ["housing.affordability"]
-    assert items["context.median_household_income"].support == "direct"
-    assert items["trajectory"].support == "unavailable"
+    assert items["context.population_density"].support == "direct"
+    assert items["vibe.daily_needs"].source_fields == ["access.daily_needs"]
 
 
 def test_build_profile_provenance_marks_missing_or_failed_sources_unavailable():
@@ -64,7 +66,7 @@ def test_build_profile_provenance_marks_missing_or_failed_sources_unavailable():
     assert items["overview"].support == "unavailable"
 
 
-def test_build_profile_provenance_marks_local_trajectory_and_amenities_supported():
+def test_build_profile_provenance_marks_local_amenities_without_trajectory_claims():
     provenance = build_profile_provenance(
         {
             SourceName.LOCAL: {
@@ -81,8 +83,7 @@ def test_build_profile_provenance_marks_local_trajectory_and_amenities_supported
 
     items = {item.claim_id: item for item in provenance.items}
     assert items["overview"].sources == [SourceName.LOCAL]
-    assert items["trajectory"].sources == [SourceName.LOCAL]
-    assert "local.development_activity" in items["trajectory"].source_fields
+    assert "trajectory" not in items
     assert items["local.amenities"].support == "inferred"
     assert items["local.amenities"].source_fields == [
         "local.parks_count",
@@ -91,7 +92,7 @@ def test_build_profile_provenance_marks_local_trajectory_and_amenities_supported
     ]
 
 
-def test_build_profile_provenance_cites_local_fields_for_scores_changed_by_local_bridge():
+def test_build_profile_provenance_does_not_use_parks_as_an_unrelated_proxy():
     provenance = build_profile_provenance(
         {
             SourceName.LOCAL: {
@@ -105,19 +106,8 @@ def test_build_profile_provenance_cites_local_fields_for_scores_changed_by_local
 
     items = {item.claim_id: item for item in provenance.items}
 
-    assert items["vibe.walkability"].support == "inferred"
-    assert items["vibe.walkability"].sources == [SourceName.LOCAL]
-    assert items["vibe.walkability"].source_fields == [
-        "local.parks_outdoors",
-        "local.parks_count",
-        "local.community_amenities_count",
-    ]
-
-    assert items["vibe.quiet"].source_fields == [
-        "local.parks_outdoors",
-        "local.parks_count",
-    ]
-    assert items["vibe.social_scene"].source_fields == ["local.community_amenities_count"]
+    assert items["vibe.walkability"].support == "unavailable"
+    assert items["vibe.parks_outdoors"].source_fields == ["local.parks_outdoors"]
     assert items["vibe.transit_access"].support == "unavailable"
     assert items["vibe.affordability"].support == "unavailable"
 

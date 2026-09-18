@@ -5,26 +5,28 @@ import {
   formToPreferenceProfilePayload,
   profileToForm,
 } from '../utils/preferenceProfiles.js';
+import { useDialogFocus } from '../hooks/useDialogFocus.js';
 
 const CATEGORY_OPTIONS = [
   ['transit', 'Transit', 'T'],
   ['walkability', 'Walkability', 'W'],
   ['parks', 'Green spaces', 'G'],
-  ['groceries', 'Retail access', 'R'],
+  ['groceries', 'Groceries', 'R'],
   ['restaurants', 'Dining', 'D'],
   ['quiet', 'Quiet', 'Q'],
   ['social_scene', 'Nightlife', 'N'],
   ['lower_rent_pressure', 'Rent pressure', '$'],
+  ['cycling', 'Cycling access', 'C'],
 ];
 
 const SELECT_OPTIONS = {
   car_reliance: [
     ['no_car', 'No car'],
     ['sometimes_car', 'Sometimes use a car'],
-    ['drive_daily', 'Drive daily'],
+    ['drive_daily', 'Drive daily (stored, not scored)'],
   ],
   energy_preference: [
-    ['quiet', 'Quiet and calm'],
+    ['quiet', 'Quiet and calm (stored, not scored)'],
     ['balanced', 'Balanced'],
     ['lively', 'Lively and social'],
   ],
@@ -34,6 +36,7 @@ const SELECT_OPTIONS = {
     ['parks_outdoors', 'Parks and outdoors'],
     ['restaurants_nightlife', 'Restaurants and nightlife'],
     ['lower_rent_pressure', 'Lower rent pressure'],
+    ['cycling_access', 'Cycling access'],
   ],
   budget_sensitivity: [
     ['very_budget_conscious', 'Very budget conscious'],
@@ -62,6 +65,7 @@ export default function PreferenceProfiles({
   const [editingProfile, setEditingProfile] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState(EMPTY_PROFILE_FORM);
+  const dialogRef = useDialogFocus(open, onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -101,24 +105,30 @@ export default function PreferenceProfiles({
   function toggleCategory(field, value) {
     setForm((current) => {
       const values = current[field];
+      const otherField = field === 'must_haves' ? 'deal_breakers' : 'must_haves';
       return {
         ...current,
         [field]: values.includes(value)
           ? values.filter((item) => item !== value)
           : [...values, value],
+        [otherField]: current[otherField].filter((item) => item !== value),
       };
     });
   }
 
+  function confirmDelete(profile) {
+    if (window.confirm(`Delete the “${profile.name}” lens?`)) onDelete(profile.id);
+  }
+
   return (
-    <section className="workspace-backdrop" aria-label="Lifestyle profile workspace">
-      <div className="profile-workspace">
+    <section className="workspace-backdrop" role="dialog" aria-modal="true" aria-labelledby="profiles-title">
+      <div className="profile-workspace" ref={dialogRef}>
         <div className="profile-workspace-main">
           <div className="workspace-title-row">
             <div>
               <p className="eyebrow">Lifestyle Profile</p>
-              <h1>{isEditingExisting ? 'Edit analysis lens' : 'Create analysis lens'}</h1>
-              <p>Configure reusable preferences before choosing a neighborhood.</p>
+              <h1 id="profiles-title">{isEditingExisting ? 'Edit analysis lens' : 'Create analysis lens'}</h1>
+              <p>Only preferences backed by available evidence affect the fit score.</p>
             </div>
             <button type="button" className="top-icon-button" onClick={onClose} aria-label="Close profiles">
               <X size={18} aria-hidden="true" />
@@ -192,7 +202,7 @@ export default function PreferenceProfiles({
               </button>
             )}
             {selectedProfile && (
-              <button type="button" className="icon-danger" onClick={() => onDelete(selectedProfile.id)}>
+              <button type="button" className="icon-danger" onClick={() => confirmDelete(selectedProfile)}>
                 <Trash2 size={16} aria-hidden="true" />
                 Delete
               </button>
@@ -217,14 +227,6 @@ function ProfileFormFields({ form, setForm, toggleCategory }) {
           maxLength={80}
         />
       </label>
-      <label className="generic-toggle">
-        <input
-          type="checkbox"
-          checked={form.generic_mode}
-          onChange={(event) => setForm({ ...form, generic_mode: event.target.checked })}
-        />
-        Run this saved profile as generic
-      </label>
       <div className="profile-form-section preference-select-grid">
         {Object.entries(SELECT_OPTIONS).map(([field, options]) => (
           <label className="field" key={field}>
@@ -241,62 +243,34 @@ function ProfileFormFields({ form, setForm, toggleCategory }) {
         ))}
       </div>
       <label className="field">
-        <span>Commute anchor</span>
-        <input
-          value={form.commute_anchor_label}
-          onChange={(event) => setForm({ ...form, commute_anchor_label: event.target.value })}
-          placeholder="Work, school, or general area"
-        />
+        <span>Maximum monthly rent <small>CAD</small></span>
+        <div className="money-input"><span>C$</span><input type="number" min="0" step="50" value={form.max_monthly_rent} onChange={(event) => setForm({ ...form, max_monthly_rent: event.target.value })} /></div>
       </label>
-      <div className="coordinate-grid">
-        <label className="field">
-          <span>Anchor latitude</span>
-          <input
-            type="number"
-            step="any"
-            value={form.commute_anchor_lat}
-            onChange={(event) => setForm({ ...form, commute_anchor_lat: event.target.value })}
-          />
-        </label>
-        <label className="field">
-          <span>Anchor longitude</span>
-          <input
-            type="number"
-            step="any"
-            value={form.commute_anchor_lng}
-            onChange={(event) => setForm({ ...form, commute_anchor_lng: event.target.value })}
-          />
-        </label>
-      </div>
       <label className="field">
-        <span>Max monthly rent</span>
-        <input
-          type="number"
-          min="0"
-          value={form.max_monthly_rent}
-          onChange={(event) => setForm({ ...form, max_monthly_rent: event.target.value })}
-        />
-        <input
-          type="range"
-          min="0"
-          max="6000"
-          step="100"
-          value={form.max_monthly_rent || 0}
-          onChange={(event) => setForm({ ...form, max_monthly_rent: event.target.value })}
-        />
+        <span>Rental unit size <small>Required for rent fit</small></span>
+        <select value={form.rental_unit_size} onChange={(event) => setForm({ ...form, rental_unit_size: event.target.value })}>
+          <option value="">No unit selected</option>
+          <option value="studio">Studio</option>
+          <option value="one_bedroom">1 bedroom</option>
+          <option value="two_bedroom">2 bedrooms</option>
+          <option value="three_bedroom_plus">3+ bedrooms</option>
+        </select>
       </label>
+      <p className="field-help">Driving and quiet preferences are kept in this local lens but remain unscored until defensible evidence exists.</p>
       <CategoryChecklist
-        title="Must haves"
+        title="Important signals"
+        description="Adds up to 6 points when source evidence is strong."
         values={form.must_haves}
         onToggle={(value) => toggleCategory('must_haves', value)}
       />
       <CategoryChecklist
-        title="Deal breakers"
+        title="Non-negotiables"
+        description="A positive requirement; missing evidence is skipped, weak evidence is strongly penalized."
         values={form.deal_breakers}
         onToggle={(value) => toggleCategory('deal_breakers', value)}
       />
       <label className="field notes-field">
-        <span>Notes</span>
+        <span>Private notes <small>Stored locally · never scored or sent to AI</small></span>
         <textarea
           value={form.notes}
           onChange={(event) => setForm({ ...form, notes: event.target.value })}
@@ -307,10 +281,10 @@ function ProfileFormFields({ form, setForm, toggleCategory }) {
   );
 }
 
-function CategoryChecklist({ title, values, onToggle }) {
+function CategoryChecklist({ title, description, values, onToggle }) {
   return (
     <fieldset className="category-checklist">
-      <legend>{title}</legend>
+      <legend>{title}<small>{description}</small></legend>
       {CATEGORY_OPTIONS.map(([value, label, icon]) => (
         <label key={value}>
           <input type="checkbox" checked={values.includes(value)} onChange={() => onToggle(value)} />

@@ -11,6 +11,7 @@ export default function SearchBar({ onSelect }) {
 
   useEffect(() => {
     let ignore = false;
+    const controller = new AbortController();
     const timeout = setTimeout(async () => {
       if (!shouldSearchPlaces(query, selectedQuery)) {
         setResults([]);
@@ -18,14 +19,15 @@ export default function SearchBar({ onSelect }) {
       }
       try {
         setError('');
-        const nextResults = await searchPlaces(query);
+        const nextResults = await searchPlaces(query, { signal: controller.signal });
         if (!ignore) setResults(nextResults);
       } catch (err) {
-        if (!ignore) setError(err instanceof Error ? err.message : 'Search failed');
+        if (!ignore && err.name !== 'AbortError') setError(err instanceof Error ? err.message : 'Search failed');
       }
     }, 250);
     return () => {
       ignore = true;
+      controller.abort();
       clearTimeout(timeout);
     };
   }, [query, selectedQuery]);
@@ -37,7 +39,7 @@ export default function SearchBar({ onSelect }) {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={MAPBOX_TOKEN ? 'Search for a neighborhood or address...' : 'Add VITE_MAPBOX_TOKEN to enable search'}
+          placeholder={MAPBOX_TOKEN ? 'Search Toronto or the GTA' : 'Add VITE_MAPBOX_TOKEN to enable search'}
           disabled={!MAPBOX_TOKEN}
         />
       </label>

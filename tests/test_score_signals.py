@@ -2,7 +2,7 @@ from backend.models import SourceName
 from backend.score_signals import resolve_score_support, resolve_vibe_scores
 
 
-def test_resolve_vibe_scores_uses_local_parks_without_touching_transit_or_affordability():
+def test_resolve_vibe_scores_never_turns_local_parks_into_unrelated_scores():
     scores = resolve_vibe_scores(
         {
             SourceName.LOCAL: {
@@ -13,12 +13,12 @@ def test_resolve_vibe_scores_uses_local_parks_without_touching_transit_or_afford
         }
     )
 
-    assert scores.walkability == 69
-    assert scores.quiet == 59
-    assert scores.social_scene == 58
+    assert scores.walkability is None
+    assert scores.quiet is None
+    assert scores.social_scene is None
     assert scores.parks_outdoors == 88
-    assert scores.transit_access == 50
-    assert scores.affordability == 50
+    assert scores.transit_access is None
+    assert scores.affordability is None
 
 
 def test_resolve_vibe_scores_keeps_existing_source_scores_when_local_is_empty():
@@ -34,8 +34,8 @@ def test_resolve_vibe_scores_keeps_existing_source_scores_when_local_is_empty():
     assert scores.walkability == 82
     assert scores.transit_access == 77
     assert scores.affordability == 61
-    assert scores.quiet == 44
-    assert scores.social_scene == 73
+    assert scores.quiet is None
+    assert scores.social_scene is None
     assert scores.parks_outdoors is None
 
 
@@ -50,13 +50,9 @@ def test_resolve_score_support_lists_local_fields_only_when_they_influence_score
         }
     )
 
-    assert support["walkability"] == [
-        "local.parks_outdoors",
-        "local.parks_count",
-        "local.community_amenities_count",
-    ]
-    assert support["quiet"] == ["local.parks_outdoors", "local.parks_count"]
-    assert support["social_scene"] == ["local.community_amenities_count"]
+    assert support["walkability"] == []
+    assert support["quiet"] == []
+    assert support["social_scene"] == []
     assert support["parks_outdoors"] == ["local.parks_outdoors"]
     assert support["transit_access"] == []
     assert support["affordability"] == []

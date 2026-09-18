@@ -21,7 +21,11 @@ def test_health_returns_ok():
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] in {"ok", "degraded"}
+    assert set(body) == {"status", "mapbox", "openai", "snapshot", "sqlite", "osm"}
+    assert body["openai"]["required"] is False
+    assert "snapshot_id" in body["snapshot"]
 
 
 def test_analyze_returns_partial_profile_for_valid_query():
@@ -149,11 +153,17 @@ def test_preference_profile_endpoints_crud_and_default(monkeypatch):
 
     list_response = client.get("/preference-profiles")
     assert list_response.status_code == 200
-    assert [profile["id"] for profile in list_response.json()] == [first["id"], second["id"]]
+    assert [profile["id"] for profile in list_response.json()] == [
+        first["id"],
+        second["id"],
+    ]
 
     update_response = client.put(
         f"/preference-profiles/{second['id']}",
-        json={"name": "Budget and transit", "must_haves": ["transit", "lower_rent_pressure"]},
+        json={
+            "name": "Budget and transit",
+            "must_haves": ["transit", "lower_rent_pressure"],
+        },
     )
     assert update_response.status_code == 200
     updated = update_response.json()
@@ -251,7 +261,11 @@ def test_analyze_uses_selected_preference_profile(monkeypatch):
 
     generic_response = client.post(
         "/analyze",
-        json={"query": "East Austin", "preference_profile_id": profile_id, "generic_mode": True},
+        json={
+            "query": "East Austin",
+            "preference_profile_id": profile_id,
+            "generic_mode": True,
+        },
     )
 
     assert generic_response.status_code == 200
@@ -310,8 +324,13 @@ def test_analyze_includes_local_source_status_for_toronto_coordinates(monkeypatc
 
     assert response.status_code == 200
     body = response.json()
-    local_status = next(status for status in body["source_statuses"] if status["source"] == "local")
+    local_status = next(
+        status for status in body["source_statuses"] if status["source"] == "local"
+    )
     assert local_status["status"] == "success"
-    assert local_status["message"] == "Toronto open data returned development and parks signals."
+    assert (
+        local_status["message"]
+        == "Toronto open data returned development and parks signals."
+    )
     assert local_status["updated_at"] == "2026-05-08T00:00:00+00:00"
-    assert body["profile"]["trajectory"]["direction"] == "rising"
+    assert body["profile"]["trajectory"] is None

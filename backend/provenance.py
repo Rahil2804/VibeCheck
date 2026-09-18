@@ -17,78 +17,66 @@ def build_profile_provenance(
 ) -> ProfileProvenance:
     status_by_source = {status.source: status for status in statuses}
     score_support = resolve_score_support(source_data)
-    items = [
-        _overview_item(source_data, status_by_source),
+    items = [_overview_item(source_data, status_by_source)]
+    score_definitions = (
+        ("walkability", "Walkability score", SourceName.ACCESS),
+        ("transit_access", "Scheduled transit access score", SourceName.TRANSIT),
+        ("cycling_access", "Cycling access score", SourceName.CYCLING),
+        ("affordability", "Affordability score", SourceName.HOUSING),
+        ("parks_outdoors", "Parks and outdoors score", SourceName.ACCESS),
+        ("daily_needs", "Daily needs score", SourceName.ACCESS),
+        ("dining_activity", "Dining and activity score", SourceName.ACCESS),
+    )
+    items.extend(
         _score_item(
-            claim_id="vibe.walkability",
-            label="Walkability score",
-            score_key="walkability",
-            fallback_sources=[SourceName.ACCESS],
+            claim_id=f"vibe.{key}",
+            label=label,
+            score_key=key,
+            fallback_sources=[source],
             score_support=score_support,
             status_by_source=status_by_source,
+        )
+        for key, label, source in score_definitions
+    )
+    field_definitions = (
+        (
+            "context.population_density",
+            "Population density",
+            SourceName.CENSUS,
+            "population_density",
         ),
-        _score_item(
-            claim_id="vibe.transit_access",
-            label="Transit access score",
-            score_key="transit_access",
-            fallback_sources=[SourceName.ACCESS],
-            score_support=score_support,
-            status_by_source=status_by_source,
+        (
+            "context.median_renter_shelter_cost",
+            "Median renter shelter cost",
+            SourceName.CENSUS,
+            "median_renter_shelter_cost",
         ),
-        _score_item(
-            claim_id="vibe.affordability",
-            label="Affordability score",
-            score_key="affordability",
-            fallback_sources=[SourceName.HOUSING],
-            score_support=score_support,
-            status_by_source=status_by_source,
+        (
+            "context.regional_average_two_bedroom_rent",
+            "Regional average two-bedroom rent",
+            SourceName.HOUSING,
+            "average_two_bedroom_rent",
         ),
-        _score_item(
-            claim_id="vibe.quiet",
-            label="Quiet score",
-            score_key="quiet",
-            fallback_sources=[SourceName.REDDIT],
-            score_support=score_support,
-            status_by_source=status_by_source,
+        (
+            "context.rent_benchmark",
+            "Unit-matched purpose-built rent benchmark",
+            SourceName.HOUSING,
+            "rent_benchmark",
         ),
-        _score_item(
-            claim_id="vibe.social_scene",
-            label="Social scene score",
-            score_key="social_scene",
-            fallback_sources=[SourceName.REDDIT],
-            score_support=score_support,
-            status_by_source=status_by_source,
-        ),
+    )
+    items.extend(
         _field_item(
-            claim_id="context.median_age",
-            label="Median age",
-            source=SourceName.CENSUS,
-            source_field="median_age",
+            claim_id=claim_id,
+            label=label,
+            source=source,
+            source_field=field,
             source_data=source_data,
             status_by_source=status_by_source,
             support=ProvenanceSupport.DIRECT,
-        ),
-        _field_item(
-            claim_id="context.median_household_income",
-            label="Median household income",
-            source=SourceName.CENSUS,
-            source_field="median_household_income",
-            source_data=source_data,
-            status_by_source=status_by_source,
-            support=ProvenanceSupport.DIRECT,
-        ),
-        _field_item(
-            claim_id="context.population_density",
-            label="Population density",
-            source=SourceName.CENSUS,
-            source_field="population_density",
-            source_data=source_data,
-            status_by_source=status_by_source,
-            support=ProvenanceSupport.DIRECT,
-        ),
-        _local_amenities_item(source_data, status_by_source),
-        _trajectory_item(source_data, status_by_source),
-    ]
+        )
+        for claim_id, label, source, field in field_definitions
+    )
+    items.append(_local_amenities_item(source_data, status_by_source))
     return ProfileProvenance(items=items)
 
 
@@ -98,9 +86,10 @@ def _overview_item(
 ) -> ProvenanceItem:
     tracked_sources = (
         SourceName.ACCESS,
+        SourceName.TRANSIT,
+        SourceName.CYCLING,
         SourceName.HOUSING,
         SourceName.CENSUS,
-        SourceName.REDDIT,
         SourceName.LOCAL,
     )
     available = [source for source in tracked_sources if _has_data(source_data, source)]
@@ -114,7 +103,9 @@ def _overview_item(
             sources=available,
             source_fields=[],
         )
-    summaries = [_status_summary(source, status_by_source) for source in tracked_sources]
+    summaries = [
+        _status_summary(source, status_by_source) for source in tracked_sources
+    ]
     return ProvenanceItem(
         claim_id="overview",
         label="Overview",
@@ -175,7 +166,9 @@ def _score_item(
             source_fields=fields,
         )
 
-    summaries = "; ".join(_status_summary(source, status_by_source) for source in fallback_sources)
+    summaries = "; ".join(
+        _status_summary(source, status_by_source) for source in fallback_sources
+    )
     return ProvenanceItem(
         claim_id=claim_id,
         label=label,
@@ -189,53 +182,14 @@ def _score_item(
 def _sources_from_source_fields(fields: list[str]) -> list[SourceName]:
     ordered_sources = [
         SourceName.ACCESS,
+        SourceName.TRANSIT,
+        SourceName.CYCLING,
         SourceName.HOUSING,
         SourceName.CENSUS,
-        SourceName.REDDIT,
         SourceName.LOCAL,
     ]
     present = {field.split(".", maxsplit=1)[0] for field in fields}
     return [source for source in ordered_sources if source.value in present]
-
-
-def _trajectory_item(
-    source_data: dict[SourceName, dict[str, Any]],
-    status_by_source: dict[SourceName, SourceStatus],
-) -> ProvenanceItem:
-    trend_fields = [
-        (SourceName.LOCAL, "development_activity"),
-        (SourceName.LOCAL, "recent_permits_count"),
-        (SourceName.LOCAL, "trajectory_signal"),
-        (SourceName.HOUSING, "rent_trend"),
-        (SourceName.REDDIT, "discussion_trend"),
-    ]
-    present_fields = [
-        f"{source.value}.{field}"
-        for source, field in trend_fields
-        if source_data.get(source, {}).get(field) is not None
-    ]
-    if present_fields:
-        return ProvenanceItem(
-            claim_id="trajectory",
-            label="Trajectory",
-            summary="Trajectory is inferred from available local and trend signals.",
-            support=ProvenanceSupport.INFERRED,
-            sources=_sources_for_fields(trend_fields, present_fields),
-            source_fields=present_fields,
-        )
-    return ProvenanceItem(
-        claim_id="trajectory",
-        label="Trajectory",
-        summary=(
-            "Trajectory is unavailable because trend fields are missing; "
-            f"{_status_summary(SourceName.LOCAL, status_by_source)}; "
-            f"{_status_summary(SourceName.HOUSING, status_by_source)}; "
-            f"{_status_summary(SourceName.REDDIT, status_by_source)}."
-        ),
-        support=ProvenanceSupport.UNAVAILABLE,
-        sources=[SourceName.LOCAL, SourceName.HOUSING, SourceName.REDDIT],
-        source_fields=[],
-    )
 
 
 def _local_amenities_item(
@@ -270,21 +224,15 @@ def _local_amenities_item(
     )
 
 
-def _has_data(source_data: dict[SourceName, dict[str, Any]], source: SourceName) -> bool:
+def _has_data(
+    source_data: dict[SourceName, dict[str, Any]], source: SourceName
+) -> bool:
     return bool(source_data.get(source))
 
 
-def _sources_for_fields(
-    trend_fields: list[tuple[SourceName, str]],
-    present_fields: list[str],
-) -> list[SourceName]:
-    sources = {
-        source for source, field in trend_fields if f"{source.value}.{field}" in present_fields
-    }
-    return sorted(sources, key=lambda item: item.value)
-
-
-def _status_summary(source: SourceName, status_by_source: dict[SourceName, SourceStatus]) -> str:
+def _status_summary(
+    source: SourceName, status_by_source: dict[SourceName, SourceStatus]
+) -> str:
     status = status_by_source.get(source)
     if status is None:
         return f"{source.value} source is missing"

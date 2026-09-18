@@ -4,7 +4,9 @@ from pydantic import ValidationError
 
 from backend.models import NeighborhoodProfile
 from backend.synthesizer import (
+    GroundedClaim,
     SynthesizedProfilePayload,
+    SynthesizedProfileResult,
     SynthesizerUnavailable,
     parse_profile_payload,
     synthesize_profile,
@@ -80,26 +82,13 @@ async def test_synthesize_profile_uses_openai_safe_payload_schema(monkeypatch):
     captured = {}
 
     parsed_payload = SynthesizedProfilePayload(
-        overview="Synthesized overview.",
-        vibe_scores={
-            "walkability": 81,
-            "transit_access": 67,
-            "affordability": 45,
-            "quiet": 58,
-            "social_scene": 73,
-        },
-        who_lives_here={
-            "median_age": None,
-            "median_household_income": None,
-            "population_density": None,
-            "population_trend": None,
-        },
-        honest_pros=["Good access signals."],
-        honest_cons=["Affordability is mixed."],
-        trajectory={
-            "direction": "uncertain",
-            "summary": "Trajectory is uncertain from current MVP sources.",
-        },
+        overview=GroundedClaim(
+            text="Access evidence is available.", evidence_ids=["access"]
+        ),
+        honest_pros=[
+            GroundedClaim(text="Access is supported.", evidence_ids=["access"])
+        ],
+        honest_cons=[GroundedClaim(text="Rent is unavailable.", evidence_ids=["rent"])],
     )
 
     class Response:
@@ -112,17 +101,28 @@ async def test_synthesize_profile_uses_openai_safe_payload_schema(monkeypatch):
                 captured.update(kwargs)
                 return Response()
 
-    profile = await synthesize_profile(
+    result = await synthesize_profile(
         place_label="East Austin",
-        source_data={"access": {"walkability": 82}},
+        evidence={
+            "checks": [
+                {"id": "access", "status": "supported", "facts": {"walkability": 82}},
+                {
+                    "id": "rent",
+                    "status": "supported",
+                    "facts": {"availability": "missing"},
+                },
+            ]
+        },
         caveats=[],
         client=CapturingClient(),
     )
 
     assert captured["text_format"] is SynthesizedProfilePayload
-    assert isinstance(profile, NeighborhoodProfile)
-    assert profile.overview == "Synthesized overview."
-    assert profile.provenance.items == []
+    assert captured["store"] is False
+    assert captured["max_output_tokens"] == 700
+    assert isinstance(result, SynthesizedProfileResult)
+    assert result.profile.overview == "Access evidence is available."
+    assert result.profile.narrative_citations[0].evidence_check_ids == ["access"]
 
 
 @pytest.mark.asyncio
@@ -142,3 +142,47 @@ async def test_synthesize_profile_converts_client_error_to_unavailable(monkeypat
             caveats=[],
             client=FailingClient(),
         )
+
+
+@pytest.mark.asyncio
+async def test_synthesize_profile_rejects_unsupported_and_forbidden_claims(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    parsed_payload = SynthesizedProfilePayload(
+        overview=GroundedClaim(
+            text="Everyday access evidence is available.", evidence_ids=["access"]
+        ),
+        honest_pros=[
+            GroundedClaim(text="Crime is low.", evidence_ids=["access"]),
+            GroundedClaim(text="Ideal for families.", evidence_ids=["access"]),
+        ],
+        honest_cons=[
+            GroundedClaim(text="Rent is uncertain.", evidence_ids=["missing"])
+        ],
+    )
+
+    class Response:
+        output_parsed = parsed_payload
+
+    class CapturingClient:
+        class responses:
+            @staticmethod
+            async def parse(**_kwargs):
+                return Response()
+
+    result = await synthesize_profile(
+        place_label="Toronto",
+        evidence={
+            "checks": [
+                {"id": "access", "status": "supported", "facts": {"daily_needs": 72}}
+            ]
+        },
+        caveats=[],
+        client=CapturingClient(),
+    )
+
+    assert result is not None
+    assert result.accepted_claim_count == 1
+    assert result.rejected_claim_count == 3
+    assert result.rejected_sections == ("pro", "pro", "con")
+    assert result.profile.honest_pros == []
+    assert result.profile.honest_cons == []

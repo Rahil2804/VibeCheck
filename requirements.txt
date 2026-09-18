@@ -1,8 +1,8 @@
 fastapi
 uvicorn[standard]
 httpx
+openpyxl
 openai
-praw
 python-dotenv
 pydantic
 pytest

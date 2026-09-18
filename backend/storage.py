@@ -6,6 +6,8 @@ from pathlib import Path
 from uuid import uuid4
 
 from backend.models import (
+    AnalysisLensMode,
+    AnalysisLensSnapshot,
     AnalyzeRequest,
     AnalyzeResponse,
     CommuteAnchor,
@@ -44,6 +46,7 @@ def initialize_database(db_path: Path | None = None) -> None:
             """
         )
         _ensure_column(connection, "saved_profiles", "analyze_request_json", "TEXT")
+        _ensure_column(connection, "saved_profiles", "analysis_lens_json", "TEXT")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS preference_profiles (
@@ -56,6 +59,7 @@ def initialize_database(db_path: Path | None = None) -> None:
                 generic_mode INTEGER NOT NULL,
                 commute_anchor_json TEXT,
                 max_monthly_rent INTEGER,
+                rental_unit_size TEXT,
                 must_haves_json TEXT NOT NULL,
                 deal_breakers_json TEXT NOT NULL,
                 notes TEXT,
@@ -65,6 +69,18 @@ def initialize_database(db_path: Path | None = None) -> None:
             )
             """
         )
+        _ensure_column(connection, "preference_profiles", "rental_unit_size", "TEXT")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS source_cache (
+                cache_key TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                stored_at TEXT NOT NULL,
+                expires_at TEXT
+            )
+            """
+        )
+        _migrate_overlapping_preference_categories(connection)
 
 
 def save_profile(
@@ -97,10 +113,11 @@ def save_profile(
                 source_statuses_json,
                 response_json,
                 analyze_request_json,
+                analysis_lens_json,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 profile_id,
@@ -109,7 +126,10 @@ def save_profile(
                 response.confidence.level.value,
                 source_statuses_json,
                 response.model_dump_json(),
-                analyze_request.model_dump_json() if analyze_request is not None else None,
+                analyze_request.model_dump_json()
+                if analyze_request is not None
+                else None,
+                response.analysis_lens.model_dump_json(),
                 timestamp,
                 timestamp,
             ),
@@ -134,7 +154,9 @@ def list_saved_profiles(db_path: Path | None = None) -> list[SavedProfileSummary
                 coordinates_json,
                 confidence_level,
                 source_statuses_json,
+                response_json,
                 analyze_request_json,
+                analysis_lens_json,
                 created_at,
                 updated_at
             FROM saved_profiles
@@ -163,6 +185,7 @@ def get_saved_profile(
                 source_statuses_json,
                 response_json,
                 analyze_request_json,
+                analysis_lens_json,
                 created_at,
                 updated_at
             FROM saved_profiles
@@ -213,6 +236,7 @@ def update_saved_profile(
                 source_statuses_json = ?,
                 response_json = ?,
                 analyze_request_json = ?,
+                analysis_lens_json = ?,
                 updated_at = ?
             WHERE id = ?
             """,
@@ -222,7 +246,10 @@ def update_saved_profile(
                 response.confidence.level.value,
                 source_statuses_json,
                 response.model_dump_json(),
-                analyze_request.model_dump_json() if analyze_request is not None else None,
+                analyze_request.model_dump_json()
+                if analyze_request is not None
+                else None,
+                response.analysis_lens.model_dump_json(),
                 timestamp,
                 profile_id,
             ),
@@ -267,7 +294,9 @@ def create_preference_profile(
     timestamp = _utc_timestamp()
 
     with _connect(path) as connection:
-        existing_count = connection.execute("SELECT COUNT(*) FROM preference_profiles").fetchone()[0]
+        existing_count = connection.execute(
+            "SELECT COUNT(*) FROM preference_profiles"
+        ).fetchone()[0]
         is_default = existing_count == 0
         connection.execute(
             """
@@ -281,6 +310,7 @@ def create_preference_profile(
                 generic_mode,
                 commute_anchor_json,
                 max_monthly_rent,
+                rental_unit_size,
                 must_haves_json,
                 deal_breakers_json,
                 notes,
@@ -288,7 +318,7 @@ def create_preference_profile(
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             _profile_values(profile_id, profile, is_default, timestamp, timestamp),
         )
@@ -345,27 +375,44 @@ def update_preference_profile(
     fields_set = update.model_fields_set
     merged = PreferenceProfileCreate(
         name=update.name if "name" in fields_set else current.name,
-        car_reliance=update.car_reliance if "car_reliance" in fields_set else current.car_reliance,
+        car_reliance=update.car_reliance
+        if "car_reliance" in fields_set
+        else current.car_reliance,
         energy_preference=(
             update.energy_preference
             if "energy_preference" in fields_set
             else current.energy_preference
         ),
-        top_priority=update.top_priority if "top_priority" in fields_set else current.top_priority,
+        top_priority=update.top_priority
+        if "top_priority" in fields_set
+        else current.top_priority,
         budget_sensitivity=(
             update.budget_sensitivity
             if "budget_sensitivity" in fields_set
             else current.budget_sensitivity
         ),
-        generic_mode=update.generic_mode if "generic_mode" in fields_set else current.generic_mode,
-        commute_anchor=update.commute_anchor if "commute_anchor" in fields_set else current.commute_anchor,
+        generic_mode=update.generic_mode
+        if "generic_mode" in fields_set
+        else current.generic_mode,
+        commute_anchor=update.commute_anchor
+        if "commute_anchor" in fields_set
+        else current.commute_anchor,
         max_monthly_rent=(
             update.max_monthly_rent
             if "max_monthly_rent" in fields_set
             else current.max_monthly_rent
         ),
-        must_haves=update.must_haves if "must_haves" in fields_set else current.must_haves,
-        deal_breakers=update.deal_breakers if "deal_breakers" in fields_set else current.deal_breakers,
+        rental_unit_size=(
+            update.rental_unit_size
+            if "rental_unit_size" in fields_set
+            else current.rental_unit_size
+        ),
+        must_haves=update.must_haves
+        if "must_haves" in fields_set
+        else current.must_haves,
+        deal_breakers=update.deal_breakers
+        if "deal_breakers" in fields_set
+        else current.deal_breakers,
         notes=update.notes if "notes" in fields_set else current.notes,
     )
     timestamp = _utc_timestamp()
@@ -383,6 +430,7 @@ def update_preference_profile(
                 generic_mode = ?,
                 commute_anchor_json = ?,
                 max_monthly_rent = ?,
+                rental_unit_size = ?,
                 must_haves_json = ?,
                 deal_breakers_json = ?,
                 notes = ?,
@@ -398,6 +446,7 @@ def update_preference_profile(
                 int(merged.generic_mode),
                 _commute_anchor_json(merged.commute_anchor),
                 merged.max_monthly_rent,
+                _enum_value(merged.rental_unit_size),
                 _category_json(merged.must_haves),
                 _category_json(merged.deal_breakers),
                 merged.notes,
@@ -485,6 +534,7 @@ def _profile_values(
         int(profile.generic_mode),
         _commute_anchor_json(profile.commute_anchor),
         profile.max_monthly_rent,
+        _enum_value(profile.rental_unit_size),
         _category_json(profile.must_haves),
         _category_json(profile.deal_breakers),
         profile.notes,
@@ -510,6 +560,7 @@ def _row_to_preference_profile(row: sqlite3.Row) -> PreferenceProfile:
             else None
         ),
         max_monthly_rent=row["max_monthly_rent"],
+        rental_unit_size=row["rental_unit_size"],
         must_haves=json.loads(row["must_haves_json"]),
         deal_breakers=json.loads(row["deal_breakers_json"]),
         notes=row["notes"],
@@ -531,10 +582,14 @@ def _enum_value(value: object) -> object:
     return value.value if hasattr(value, "value") else value
 
 
-def _connect(path: Path) -> sqlite3.Connection:
+def open_database(path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(path)
     connection.row_factory = sqlite3.Row
     return connection
+
+
+def _connect(path: Path) -> sqlite3.Connection:
+    return open_database(path)
 
 
 def _ensure_column(
@@ -544,8 +599,7 @@ def _ensure_column(
     column_type: str,
 ) -> None:
     columns = {
-        row["name"]
-        for row in connection.execute(f"PRAGMA table_info({table_name})")
+        row["name"] for row in connection.execute(f"PRAGMA table_info({table_name})")
     }
     if column_name not in columns:
         connection.execute(
@@ -563,6 +617,11 @@ def _row_to_summary(row: sqlite3.Row) -> SavedProfileSummary:
 
 def _summary_data(row: sqlite3.Row) -> dict[str, object]:
     coordinates_json = row["coordinates_json"]
+    response = (
+        AnalyzeResponse.model_validate_json(row["response_json"])
+        if "response_json" in row.keys()
+        else None
+    )
     return {
         "id": row["id"],
         "place_label": row["place_label"],
@@ -584,4 +643,36 @@ def _summary_data(row: sqlite3.Row) -> dict[str, object]:
             and row["analyze_request_json"] is not None
             else None
         ),
+        "analysis_lens": _analysis_lens_from_row(row),
+        "coverage": response.coverage if response is not None else None,
+        "fit_score": response.fit.score
+        if response is not None and response.fit
+        else None,
+        "fit_label": response.fit.label
+        if response is not None and response.fit
+        else None,
     }
+
+
+def _analysis_lens_from_row(row: sqlite3.Row) -> AnalysisLensSnapshot:
+    if "analysis_lens_json" in row.keys() and row["analysis_lens_json"]:
+        return AnalysisLensSnapshot.model_validate_json(row["analysis_lens_json"])
+    return AnalysisLensSnapshot(
+        mode=AnalysisLensMode.LEGACY,
+        profile_name="Legacy report",
+    )
+
+
+def _migrate_overlapping_preference_categories(connection: sqlite3.Connection) -> None:
+    rows = connection.execute(
+        "SELECT id, must_haves_json, deal_breakers_json FROM preference_profiles"
+    ).fetchall()
+    for row in rows:
+        must_haves = json.loads(row["must_haves_json"])
+        deal_breakers = json.loads(row["deal_breakers_json"])
+        normalized = [item for item in must_haves if item not in set(deal_breakers)]
+        if normalized != must_haves:
+            connection.execute(
+                "UPDATE preference_profiles SET must_haves_json = ? WHERE id = ?",
+                (json.dumps(normalized), row["id"]),
+            )
