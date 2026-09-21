@@ -137,7 +137,7 @@ def test_osm_transit_is_a_labelled_fallback_not_equivalent_support():
     assert profile.transit_context.nearby_stop_count == 4
 
 
-def test_cycling_weights_protected_network_total_network_and_stations():
+def test_cycling_uses_common_network_formula_and_keeps_stations_as_context():
     context = score_cycling_access(
         [
             {"distance_m": 300, "length_m": 3_000, "protected": True},
@@ -239,6 +239,20 @@ def test_bundled_census_boundaries_resolve_east_york_coordinates(
     assert geography.is_toronto is True
     assert geography.census_subdivision_name == "Toronto"
     assert geography.resolution == "bundled official boundary"
+
+
+def test_resolved_coordinates_prevent_toronto_text_from_overriding_geography():
+    geography = resolve_geography(
+        Place(
+            label="Toronto, Ohio",
+            city="Toronto",
+            coordinates=Coordinates(lat=40.4642, lng=-80.6009),
+        )
+    )
+
+    assert geography.is_toronto is False
+    assert geography.is_gta is False
+    assert geography.census_subdivision_id is None
 
 
 def test_cmhc_normalizer_selects_2025_rent_and_vacancy_columns(monkeypatch):

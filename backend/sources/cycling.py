@@ -1,65 +1,146 @@
 from __future__ import annotations
 
 import math
+import sqlite3
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
+
+from backend.geography import resolve_geography
+from backend.models import CyclingEvidenceMethod
 from backend.snapshot import load_manifest, snapshot_connection
 from backend.sources.common import SourceContext, SourceResult
+from backend.sources.osm import (
+    CYCLING_RADIUS_METERS,
+    OSM_SOURCE_URL,
+    fetch_osm_context,
+    score_cycling_lengths,
+)
 
 
-NETWORK_RADIUS_M = 1_000
+NETWORK_RADIUS_M = CYCLING_RADIUS_METERS
 BIKE_SHARE_RADIUS_M = 800
 SOURCE_URL = "https://open.toronto.ca/dataset/major-city-wide-cycling-routes/"
+OFFICIAL_NETWORK_STALE_AFTER = timedelta(days=90)
 
 
-async def fetch_cycling_context(context: SourceContext) -> SourceResult:
+async def fetch_cycling_context(
+    context: SourceContext,
+    client: httpx.AsyncClient | None = None,
+) -> SourceResult:
     coordinates = context.place.coordinates
     if coordinates is None:
         return SourceResult(
             data={}, message="Cycling access needs resolved coordinates."
         )
-    if not _inside_toronto(coordinates.lat, coordinates.lng):
-        return SourceResult(
-            data={},
-            message="Cycling evidence is currently available only inside Toronto.",
-            scope="City of Toronto",
-            source_url=SOURCE_URL,
-        )
 
+    geography = context.geography or resolve_geography(context.place)
+    if geography.is_toronto:
+        official = _official_toronto_context(context)
+        if official is not None:
+            return official
+    return await _osm_fallback(context, client=client)
+
+
+def _official_toronto_context(context: SourceContext) -> SourceResult | None:
+    coordinates = context.place.coordinates
+    if coordinates is None:
+        return None
     manifest = load_manifest()
-    connection = snapshot_connection()
-    if connection is None or manifest is None:
-        return SourceResult(
-            data={},
-            message="The bundled Toronto cycling snapshot is unavailable.",
-            scope="City of Toronto",
-            source_url=SOURCE_URL,
-        )
+    if manifest is None:
+        return None
+    connection = None
     try:
+        connection = snapshot_connection()
+        if connection is None:
+            return None
         segments = _nearby_segments(connection, coordinates.lat, coordinates.lng)
         stations = _nearby_stations(connection, coordinates.lat, coordinates.lng)
         data = score_cycling_access(segments, stations)
-        data.update(
-            {
-                "scope": "City of Toronto",
-                "edition": str(
-                    manifest.get("edition")
-                    or manifest.get("snapshot_id")
-                    or "Bundled GTA snapshot"
-                ),
-            }
-        )
-        return SourceResult(
-            data=data,
-            message="Bundled City cycling-network and Bike Share station evidence returned.",
-            updated_at=manifest.get("created_at"),
-            edition=data["edition"],
-            scope=data["scope"],
-            source_url=SOURCE_URL,
-            stale=bool(manifest.get("stale", False)),
-        )
+    except (OSError, sqlite3.Error):
+        return None
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
+
+    updated_at = _source_retrieved_at(manifest, "Toronto cycling network")
+    stale = _is_stale(updated_at, OFFICIAL_NETWORK_STALE_AFTER)
+    edition = str(
+        manifest.get("edition")
+        or manifest.get("snapshot_id")
+        or "Bundled GTA snapshot"
+    )
+    data.update(
+        {
+            "scope": "City of Toronto",
+            "edition": edition,
+            "method": CyclingEvidenceMethod.TORONTO_OFFICIAL.value,
+            "fallback": False,
+            "network_radius_m": NETWORK_RADIUS_M,
+            "bicycle_parking_locations": None,
+            "updated_at": updated_at,
+            "source_url": SOURCE_URL,
+        }
+    )
+    return SourceResult(
+        data=data,
+        message=(
+            "Bundled City cycling-network evidence returned; Bike Share station locations are context only."
+        ),
+        updated_at=updated_at,
+        edition=edition,
+        scope="City of Toronto",
+        source_url=SOURCE_URL,
+        stale=stale,
+        fallback=False,
+    )
+
+
+async def _osm_fallback(
+    context: SourceContext,
+    *,
+    client: httpx.AsyncClient | None,
+) -> SourceResult:
+    result = await fetch_osm_context(context, client=client)
+    data = dict(result.data.get("cycling", {}))
+    if not data:
+        return SourceResult(
+            data={},
+            message="OpenStreetMap cycling evidence was unavailable.",
+            scope="Mapped cycling infrastructure near this address",
+            source_url=OSM_SOURCE_URL,
+            stale=bool(result.stale),
+            fallback=True,
+        )
+    data.update(
+        {
+            "scope": "OpenStreetMap mapped cycling infrastructure",
+            "edition": "OpenStreetMap live proximity query",
+            "method": CyclingEvidenceMethod.OSM_FALLBACK.value,
+            "fallback": True,
+            "bike_share_stations": None,
+            "updated_at": result.updated_at,
+            "source_url": OSM_SOURCE_URL,
+        }
+    )
+    has_network = bool(data.get("total_network_km"))
+    return SourceResult(
+        data=data,
+        message=(
+            "Using stale cached OpenStreetMap cycling evidence because live endpoints are unavailable."
+            if result.stale
+            else "OpenStreetMap returned mapped cycling infrastructure near this address."
+            if has_network
+            else "OpenStreetMap returned no mapped qualifying cycling infrastructure within 1 km."
+        ),
+        updated_at=result.updated_at,
+        edition=data["edition"],
+        scope=data["scope"],
+        source_url=OSM_SOURCE_URL,
+        stale=bool(result.stale),
+        fallback=True,
+    )
 
 
 def score_cycling_access(
@@ -83,13 +164,12 @@ def score_cycling_access(
         if float(station.get("distance_m", BIKE_SHARE_RADIUS_M + 1))
         <= BIKE_SHARE_RADIUS_M
     )
-    protected_points = min(protected_m / 3_000, 1) * 50
-    total_points = min(total_m / 5_000, 1) * 25
-    station_points = min(station_count / 5, 1) * 25
+    protected_km = protected_m / 1_000
+    total_km = total_m / 1_000
     return {
-        "score": round(protected_points + total_points + station_points),
-        "protected_network_km": round(protected_m / 1_000, 2),
-        "total_network_km": round(total_m / 1_000, 2),
+        "score": score_cycling_lengths(protected_km, total_km),
+        "protected_network_km": round(protected_km, 2),
+        "total_network_km": round(total_km, 2),
         "bike_share_stations": station_count,
     }
 
@@ -136,8 +216,25 @@ def _bounded_rows(
     ).fetchall()
 
 
-def _inside_toronto(lat: float, lng: float) -> bool:
-    return 43.58 <= lat <= 43.86 and -79.64 <= lng <= -79.11
+def _source_retrieved_at(manifest: dict[str, Any], source_name: str) -> str | None:
+    for source in manifest.get("sources", []):
+        if isinstance(source, dict) and source.get("name") == source_name:
+            value = source.get("retrieved_at")
+            return str(value) if value else None
+    value = manifest.get("created_at")
+    return str(value) if value else None
+
+
+def _is_stale(value: str | None, max_age: timedelta) -> bool:
+    if not value:
+        return True
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+    return timestamp < datetime.now(UTC) - max_age
 
 
 def _distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:

@@ -125,6 +125,12 @@ def score_fit(profile: NeighborhoodProfile, preferences: Preferences) -> FitScor
         else:
             signal, value, claim_id = priority
             impact = 15 if value >= 70 else -15 if value < 45 else 0
+            fallback_cycling = (
+                preferences.top_priority == TopPriority.CYCLING_ACCESS
+                and _cycling_is_fallback(profile)
+            )
+            if fallback_cycling:
+                impact = _half_impact(impact)
             add(
                 signal,
                 value,
@@ -135,6 +141,11 @@ def score_fit(profile: NeighborhoodProfile, preferences: Preferences) -> FitScor
                     else f"{signal} is weak for your top priority."
                     if impact < 0
                     else f"{signal} has mixed support for your top priority."
+                )
+                + (
+                    " The OSM estimate receives reduced fit weight."
+                    if fallback_cycling
+                    else ""
                 ),
                 claim_id,
             )
@@ -201,13 +212,24 @@ def score_fit(profile: NeighborhoodProfile, preferences: Preferences) -> FitScor
             continue
         signal, value, claim_id = resolved
         impact = 6 if value >= 60 else -4
+        fallback_cycling = (
+            category == PreferenceCategory.CYCLING
+            and _cycling_is_fallback(profile)
+        )
+        if fallback_cycling:
+            impact = _half_impact(impact)
         impact = max(-18 - important_total, min(18 - important_total, impact))
         important_total += impact
         add(
             f"Important: {signal}",
             value,
             impact,
-            f"{signal} {'is supported' if value >= 60 else 'has weak support'} as an important signal.",
+            f"{signal} {'is supported' if value >= 60 else 'has weak support'} as an important signal."
+            + (
+                " The OSM estimate receives reduced fit weight."
+                if fallback_cycling
+                else ""
+            ),
             claim_id,
         )
 
@@ -218,7 +240,23 @@ def score_fit(profile: NeighborhoodProfile, preferences: Preferences) -> FitScor
             unavailable.add(category.value)
             continue
         signal, value, claim_id = resolved
-        if value >= 60:
+        fallback_cycling = (
+            category == PreferenceCategory.CYCLING
+            and _cycling_is_fallback(profile)
+        )
+        if fallback_cycling and value >= 60:
+            impact = 3
+            explanation = (
+                f"{signal} clears your non-negotiable threshold using reduced-weight "
+                "OSM fallback evidence."
+            )
+        elif fallback_cycling:
+            impact = 0
+            explanation = (
+                f"{signal} has weak mapped support, but OSM fallback evidence cannot "
+                "conclusively fail a non-negotiable."
+            )
+        elif value >= 60:
             impact = 5
             explanation = f"{signal} clears your non-negotiable threshold."
         else:
@@ -353,6 +391,17 @@ def _category_signal(
 def _average(*values: int | None) -> float | None:
     available = [value for value in values if value is not None]
     return sum(available) / len(available) if available else None
+
+
+def _cycling_is_fallback(profile: NeighborhoodProfile) -> bool:
+    return bool(profile.cycling_context and profile.cycling_context.fallback)
+
+
+def _half_impact(impact: int) -> int:
+    if impact == 0:
+        return 0
+    magnitude = (abs(impact) + 1) // 2
+    return magnitude if impact > 0 else -magnitude
 
 
 def _source_fields(profile: NeighborhoodProfile, *claim_ids: str) -> list[str]:

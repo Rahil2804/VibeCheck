@@ -8,7 +8,13 @@ from backend.models import (
     AnalysisLensSnapshot,
     AnalyzeRequest,
     AnalyzeResponse,
+    BuildingContext,
+    CollisionContext,
     Confidence,
+    CyclingContext,
+    CyclingEvidenceMethod,
+    EvidenceCheck,
+    EvidenceCheckStatus,
     NeighborhoodProfile,
     Place,
     PreferenceProfileCreate,
@@ -379,6 +385,62 @@ def test_saved_report_summary_preserves_immutable_lens_and_coverage():
     assert summary.analysis_lens.profile_name == "Transit first"
     assert summary.analysis_lens.preferences.top_priority == "transit_access"
     assert summary.coverage is not None
+
+
+def test_saved_report_summary_includes_collision_and_building_context():
+    db_path = _db_path()
+    response = _response("210 Wychwood Avenue")
+    response.profile.collision_context = CollisionContext(
+        baseline_period_start="2021-01-01",
+        baseline_period_end="2025-12-31",
+        total_collisions=42,
+        injury_collisions=8,
+        fatal_collisions=1,
+        pedestrian_involved_collisions=5,
+        cyclist_involved_collisions=3,
+        ksi_period_start="2021-01-01",
+        ksi_period_end="2026-08-29",
+        ksi_collisions=6,
+        ksi_fatal_collisions=1,
+        ksi_pedestrian_involved_collisions=2,
+        ksi_cyclist_involved_collisions=1,
+        edition="fixture",
+    )
+    response.profile.building_context = BuildingContext(
+        rsn="4154972",
+        site_address="210 WYCHWOOD AVE",
+        current_score=98,
+        rating="green",
+        edition="fixture",
+    )
+    response.profile.vibe_scores.cycling_access = 64
+    response.profile.cycling_context = CyclingContext(
+        protected_network_km=1.2,
+        total_network_km=2.4,
+        bicycle_parking_locations=3,
+        scope="OpenStreetMap mapped cycling infrastructure",
+        edition="OpenStreetMap live proximity query",
+        method=CyclingEvidenceMethod.OSM_FALLBACK,
+        fallback=True,
+    )
+    response.evidence_checks = [
+        EvidenceCheck(
+            id="building",
+            label="RentSafeTO building record",
+            status=EvidenceCheckStatus.SUPPORTED,
+            summary="Exact address matched.",
+        )
+    ]
+
+    save_profile(response, db_path)
+    summary = list_saved_profiles(db_path)[0]
+
+    assert summary.collision_count == 42
+    assert summary.ksi_collision_count == 6
+    assert summary.building_match is True
+    assert summary.building_score == 98
+    assert summary.cycling_score == 64
+    assert summary.cycling_evidence_method == "osm_fallback"
 
 
 def test_migration_resolves_overlapping_categories_with_non_negotiable_winning():

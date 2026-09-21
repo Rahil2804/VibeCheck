@@ -197,6 +197,78 @@ async def test_pipeline_uses_synthesized_profile_when_available():
 
 
 @pytest.mark.asyncio
+async def test_road_and_building_evidence_affects_context_not_fit_metrics():
+    captured_evidence = None
+
+    async def collision_adapter():
+        return {
+            "collision_context": {
+                "radius_m": 1000,
+                "baseline_period_start": "2020-01-01",
+                "baseline_period_end": "2024-12-31",
+                "total_collisions": 20,
+                "injury_collisions": 4,
+                "fatal_collisions": 0,
+                "pedestrian_involved_collisions": 2,
+                "cyclist_involved_collisions": 1,
+                "ksi_period_start": "2020-01-01",
+                "ksi_period_end": "2026-09-01",
+                "ksi_collisions": 3,
+                "ksi_fatal_collisions": 0,
+                "ksi_pedestrian_involved_collisions": 1,
+                "ksi_cyclist_involved_collisions": 1,
+                "severe_events": [],
+                "edition": "fixture",
+            }
+        }
+
+    async def building_adapter():
+        return {
+            "building_context": {
+                "rsn": "1234",
+                "site_address": "210 WYCHWOOD AVE",
+                "current_score": 86,
+                "rating": "green",
+                "edition": "fixture",
+            }
+        }
+
+    async def capture_synthesizer(**kwargs):
+        nonlocal captured_evidence
+        captured_evidence = kwargs["evidence"]
+        return None
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(
+            query="210 Wychwood Avenue, Toronto",
+            preferences=Preferences(top_priority=TopPriority.WALKABILITY_ERRANDS),
+        ),
+        source_fetchers={
+            SourceName.ACCESS: _access_adapter,
+            SourceName.COLLISIONS: collision_adapter,
+            SourceName.BUILDING: building_adapter,
+        },
+        source_timeout_seconds=1,
+        profile_synthesizer=capture_synthesizer,
+    )
+
+    assert response.profile.vibe_scores.walkability == 80
+    assert response.fit is not None and response.fit.score == 65
+    assert response.profile.collision_context is not None
+    assert response.profile.building_context is not None
+    assert response.confidence.level == "medium"
+    assert {
+        check.id for check in response.evidence_checks if check.status == "supported"
+    } >= {"access", "collisions", "building"}
+    assert captured_evidence is not None
+    assert {check["id"] for check in captured_evidence["checks"]} >= {
+        "access",
+        "collisions",
+        "building",
+    }
+
+
+@pytest.mark.asyncio
 async def test_pipeline_falls_back_when_synthesizer_fails():
     async def failing_synthesizer(**_kwargs):
         raise RuntimeError("model failed")
@@ -574,7 +646,64 @@ async def test_unreadable_snapshot_produces_one_actionable_setup_check(monkeypat
         if status.source in {SourceName.HOUSING, SourceName.TRANSIT, SourceName.CYCLING}
     ]
     assert len(snapshot_statuses) == 3
-    assert all(status.status == SourceStatusCode.EMPTY for status in snapshot_statuses)
+    statuses = {status.source: status.status for status in snapshot_statuses}
+    assert statuses[SourceName.HOUSING] == SourceStatusCode.EMPTY
+    assert statuses[SourceName.TRANSIT] == SourceStatusCode.EMPTY
+    assert statuses[SourceName.CYCLING] == SourceStatusCode.SUCCESS
     assert not any(
         "unable to open database" in status.message for status in snapshot_statuses
     )
+
+
+@pytest.mark.asyncio
+async def test_pipeline_preserves_valid_zero_osm_cycling_as_fallback_evidence():
+    async def cycling_adapter(_context: SourceContext):
+        return SourceResult(
+            data={
+                "score": 0,
+                "protected_network_km": 0,
+                "total_network_km": 0,
+                "bike_share_stations": None,
+                "bicycle_parking_locations": 0,
+                "network_radius_m": 1000,
+                "scope": "OpenStreetMap mapped cycling infrastructure",
+                "edition": "OpenStreetMap live proximity query",
+                "method": "osm_fallback",
+                "fallback": True,
+            },
+            message=(
+                "OpenStreetMap returned no mapped qualifying cycling "
+                "infrastructure within 1 km."
+            ),
+            scope="OpenStreetMap mapped cycling infrastructure",
+            edition="OpenStreetMap live proximity query",
+            fallback=True,
+        )
+
+    response = await analyze_neighborhood(
+        AnalyzeRequest(
+            query="Ottawa, Ontario",
+            coordinates={"lat": 45.4215, "lng": -75.6972},
+            preferences=Preferences(top_priority=TopPriority.CYCLING_ACCESS),
+        ),
+        source_fetchers={SourceName.CYCLING: cycling_adapter},
+        source_timeout_seconds=1,
+        profile_synthesizer=_returns_none,
+    )
+
+    cycling_status = next(
+        status
+        for status in response.source_statuses
+        if status.source == SourceName.CYCLING
+    )
+    cycling_check = next(
+        check for check in response.evidence_checks if check.id == "cycling"
+    )
+    assert cycling_status.fallback is True
+    assert cycling_check.status == "fallback"
+    assert response.profile.vibe_scores.cycling_access == 0
+    assert response.profile.cycling_context is not None
+    assert response.profile.cycling_context.method == "osm_fallback"
+    assert "Cycling access" in response.coverage.supported_signals
+    assert response.fit is not None
+    assert response.fit.factors[0].impact == -8

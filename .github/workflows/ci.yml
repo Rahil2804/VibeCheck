@@ -55,4 +55,4 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - run: python -m backend.snapshot
       - run: python -m backend.doctor
-      - run: python -m pytest tests/test_gta_snapshot.py -q
+      - run: python -m pytest tests/test_gta_snapshot.py tests/test_road_building_evidence.py -q

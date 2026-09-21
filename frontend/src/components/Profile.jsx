@@ -67,8 +67,10 @@ export default function Profile({
         <p>{profile.overview}</p>
         <CitationLinks citations={profile.narrative_citations} section="overview" checks={evidenceChecks} />
       </article>
-      <div id="evidence-card-access"><ScoreCards scores={profile.vibe_scores} /></div>
-      <EvidenceCards profile={profile} />
+      <div id="evidence-card-access">
+        <ScoreCards scores={profile.vibe_scores} cyclingContext={profile.cycling_context} />
+      </div>
+      <EvidenceCards profile={profile} evidenceChecks={evidenceChecks} />
       <AreaContext context={profile.who_lives_here} />
       <div className="insight-list">
         <article>
@@ -180,11 +182,16 @@ function CitationLinks({ citations = [], section, checks }) {
   );
 }
 
-function EvidenceCards({ profile }) {
+function EvidenceCards({ profile, evidenceChecks = [] }) {
   const transit = profile.transit_context;
   const cycling = profile.cycling_context;
   const rent = profile.who_lives_here?.rent_benchmark;
-  if (!transit && !cycling && !rent) return null;
+  const collisions = profile.collision_context;
+  const building = profile.building_context;
+  const cyclingCheck = evidenceChecks.find((check) => check.id === 'cycling');
+  const collisionCheck = evidenceChecks.find((check) => check.id === 'collisions');
+  const buildingCheck = evidenceChecks.find((check) => check.id === 'building');
+  if (!transit && !cycling && !rent && !collisions && !building && !cyclingCheck && !collisionCheck && !buildingCheck) return null;
   return (
     <section className="evidence-card-grid" aria-label="Decision evidence">
       {transit && (
@@ -198,11 +205,37 @@ function EvidenceCards({ profile }) {
       )}
       {cycling && (
         <article className="evidence-card" id="evidence-card-cycling">
-          <p className="eyebrow">Cycling access</p>
-          <h2>{cycling.protected_network_km} km protected nearby</h2>
-          <p>{cycling.total_network_km} km total network within 1 km · {cycling.bike_share_stations} Bike Share stations within 800 m.</p>
-          <small>{cycling.scope} · station locations only, not live availability</small>
+          <div className="evidence-card-heading">
+            <p className="eyebrow">{cycling.fallback ? 'OSM cycling estimate' : 'Official Toronto cycling'}</p>
+            <span className={`evidence-state ${cyclingCheck?.status === 'stale' ? 'stale' : cycling.fallback ? 'fallback' : ''}`}>
+              {cyclingCheck?.status === 'stale' ? 'Stale data' : cycling.fallback ? 'Fallback evidence' : 'Official evidence'}
+            </span>
+          </div>
+          <h2>{cycling.protected_network_km} km protected or separated nearby</h2>
+          <p>
+            {cycling.total_network_km} km total mapped network within {(cycling.network_radius_m || 1000) / 1000} km.
+          </p>
+          {cycling.total_network_km === 0 && (
+            <p>No mapped qualifying cycling infrastructure was found; this is different from a source failure.</p>
+          )}
+          {cycling.bike_share_stations != null && (
+            <p>{cycling.bike_share_stations} Bike Share stations within 800 m; station locations only, not live availability.</p>
+          )}
+          {cycling.bicycle_parking_locations != null && (
+            <p>{cycling.bicycle_parking_locations} mapped bicycle-parking locations within 800 m.</p>
+          )}
+          <small>{cycling.scope} · {cycling.edition}</small>
+          {cycling.updated_at && <small>Evidence updated {formatEvidenceDate(cycling.updated_at)}</small>}
+          <small>
+            {cycling.fallback
+              ? 'OSM completeness varies. This is not a route, traffic-stress, or safety score.'
+              : 'Bike Share locations are context only and do not affect the cycling score.'}
+          </small>
+          {cycling.source_url && <a href={cycling.source_url} target="_blank" rel="noreferrer">View cycling source</a>}
         </article>
+      )}
+      {!cycling && cyclingCheck && (
+        <UnavailableEvidenceCard id="evidence-card-cycling" label="Cycling access" check={cyclingCheck} />
       )}
       {rent && (
         <article className="evidence-card" id="evidence-card-rent">
@@ -212,7 +245,114 @@ function EvidenceCards({ profile }) {
           <small>{rent.edition} · quality {rent.quality_code || 'not supplied'} · {rent.market_scope}</small>
         </article>
       )}
+      {collisions ? (
+        <article className="evidence-card evidence-card-wide" id="evidence-card-collisions">
+          <EvidenceCardHeading
+            label="Reported collision history nearby"
+            stale={collisions.stale || collisionCheck?.status === 'stale'}
+          />
+          <h2>{formatNumber(collisions.total_collisions)} reported collisions</h2>
+          <p>Within {formatNumber(collisions.radius_m)} m. These counts describe reported history, not safety or future risk.</p>
+          <dl className="evidence-stat-grid">
+            <EvidenceStat label="Injury" value={collisions.injury_collisions} />
+            <EvidenceStat label="Fatal" value={collisions.fatal_collisions} />
+            <EvidenceStat label="Pedestrian-involved" value={collisions.pedestrian_involved_collisions} />
+            <EvidenceStat label="Cyclist-involved" value={collisions.cyclist_involved_collisions} />
+          </dl>
+          <small>All reported collisions: {dateWindow(collisions.baseline_period_start, collisions.baseline_period_end)}</small>
+          <div className="evidence-subsection">
+            <strong>{formatNumber(collisions.ksi_collisions)} KSI collisions</strong>
+            <span>{formatNumber(collisions.ksi_fatal_collisions)} fatal · {formatNumber(collisions.ksi_pedestrian_involved_collisions)} pedestrian-involved · {formatNumber(collisions.ksi_cyclist_involved_collisions)} cyclist-involved</span>
+            <small>Killed-or-seriously-injured data: {dateWindow(collisions.ksi_period_start, collisions.ksi_period_end)}. Annual and daily counts are shown separately.</small>
+            {collisions.severe_events?.length > 0 && <small>{collisions.severe_events.length} recent deduplicated KSI points are available on the map.</small>}
+          </div>
+          <SourceLinks links={[
+            [collisions.baseline_source_url, 'Official all-collision dataset'],
+            [collisions.ksi_source_url, 'Official KSI dataset'],
+          ]} />
+        </article>
+      ) : collisionCheck ? (
+        <UnavailableEvidenceCard id="evidence-card-collisions" label="Reported collision history nearby" check={collisionCheck} />
+      ) : null}
+      {building ? (
+        <article className="evidence-card evidence-card-wide" id="evidence-card-building">
+          <EvidenceCardHeading
+            label="RentSafeTO building record"
+            stale={building.stale || buildingCheck?.status === 'stale'}
+          />
+          <div className="building-score-row">
+            <h2>{building.current_score == null ? 'Registered record' : `${formatNumber(building.current_score)} / 100`}</h2>
+            {building.rating && <span className={`building-rating rating-${building.rating}`}>{building.rating}</span>}
+          </div>
+          <p><strong>{building.site_address}</strong>{building.property_type ? ` · ${building.property_type}` : ''}</p>
+          <dl className="evidence-stat-grid building-facts">
+            <EvidenceStat label="Year built" value={building.year_built} />
+            <EvidenceStat label="Storeys" value={building.storeys} />
+            <EvidenceStat label="Units" value={building.units} />
+            <EvidenceStat label="Areas evaluated" value={building.areas_evaluated} />
+            <EvidenceStat label="Proactive score" value={building.proactive_score} />
+            <EvidenceStat label="Reactive deduction" value={building.reactive_deduction == null ? null : -building.reactive_deduction} />
+          </dl>
+          <small>{building.evaluation_date ? `Latest evaluation ${formatEvidenceDate(building.evaluation_date)}` : 'No evaluation is present in the bundled record.'} · RSN {building.rsn}</small>
+          {building.low_rated_categories?.length > 0 && (
+            <div className="low-rated-list">
+              <strong>Common-area categories rated 1</strong>
+              <span>{building.low_rated_categories.join(' · ')}</span>
+            </div>
+          )}
+          <small>RentSafeTO covers registered apartment buildings and common-area/property-standard evaluations, not individual unit condition.</small>
+          <SourceLinks links={[
+            [building.registration_source_url, 'Official registration dataset'],
+            [building.evaluation_source_url, 'Official evaluation dataset'],
+          ]} />
+        </article>
+      ) : buildingCheck ? (
+        <UnavailableEvidenceCard id="evidence-card-building" label="RentSafeTO building record" check={buildingCheck} />
+      ) : null}
     </section>
+  );
+}
+
+function EvidenceCardHeading({ label, stale }) {
+  return (
+    <div className="evidence-card-heading">
+      <p className="eyebrow">{label}</p>
+      <span className={stale ? 'evidence-state stale' : 'evidence-state'}>
+        {stale ? 'Stale data' : 'Bundled official data'}
+      </span>
+    </div>
+  );
+}
+
+function EvidenceStat({ label, value }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value == null ? 'Unavailable' : formatNumber(value)}</dd>
+    </div>
+  );
+}
+
+function UnavailableEvidenceCard({ id, label, check }) {
+  return (
+    <article className={`evidence-card evidence-card-unavailable check-${check.status}`} id={id}>
+      <p className="eyebrow">{label}</p>
+      <h2>{check.status === 'error' ? 'Source failed' : 'Unavailable'}</h2>
+      <p>{check.summary}</p>
+      {check.scope && <small>{check.scope}</small>}
+    </article>
+  );
+}
+
+function SourceLinks({ links }) {
+  const available = links.filter(([url]) => url);
+  if (!available.length) return null;
+  return (
+    <div className="evidence-source-links">
+      {available.map(([url, label]) => (
+        <a href={url} target="_blank" rel="noreferrer" key={url}>{label}</a>
+      ))}
+    </div>
   );
 }
 
@@ -303,7 +443,13 @@ function evidenceTarget(id) {
     rent: 'evidence-card-rent',
     transit: 'evidence-card-transit',
     cycling: 'evidence-card-cycling',
+    collisions: 'evidence-card-collisions',
+    building: 'evidence-card-building',
   }[id];
+}
+
+function dateWindow(start, end) {
+  return `${formatEvidenceDate(start)}–${formatEvidenceDate(end)}`;
 }
 
 function formatEvidenceDate(value) {

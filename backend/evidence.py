@@ -24,6 +24,8 @@ SOURCE_CHECKS = (
     (SourceName.LOCAL, "local", "Toronto local context"),
     (SourceName.TRANSIT, "transit", "Scheduled transit"),
     (SourceName.CYCLING, "cycling", "Cycling access"),
+    (SourceName.COLLISIONS, "collisions", "Reported collision history"),
+    (SourceName.BUILDING, "building", "RentSafeTO building record"),
 )
 SOURCE_FIELDS = {
     SourceName.ACCESS: (
@@ -68,7 +70,12 @@ SOURCE_FIELDS = {
         "protected_network_km",
         "total_network_km",
         "bike_share_stations",
+        "bicycle_parking_locations",
+        "network_radius_m",
+        "method",
     ),
+    SourceName.COLLISIONS: ("collision_context",),
+    SourceName.BUILDING: ("building_context",),
 }
 
 
@@ -225,7 +232,10 @@ def _snapshot_check(snapshot: dict[str, Any]) -> EvidenceCheck:
         summary=summary,
         edition=snapshot.get("snapshot_id"),
         updated_at=snapshot.get("created_at"),
-        scope="GTA transit and rent; Toronto cycling",
+        scope=(
+            "GTA transit and rent; Toronto cycling, reported collisions, "
+            "and RentSafeTO buildings"
+        ),
         source_fields=["snapshot.manifest", "snapshot.integrity_check"],
     )
 
@@ -256,6 +266,9 @@ def _source_check(
         summary = status.message
     elif status.stale:
         state = EvidenceCheckStatus.STALE
+        summary = status.message
+    elif status.fallback:
+        state = EvidenceCheckStatus.FALLBACK
         summary = status.message
     else:
         state = EvidenceCheckStatus.SUPPORTED

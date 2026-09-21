@@ -22,7 +22,12 @@ def test_confidence_is_high_with_four_meaningful_sources():
 
     assert confidence.level == "high"
     assert confidence.available_sources == ["census", "housing", "access", "local"]
-    assert confidence.missing_sources == ["transit", "cycling"]
+    assert confidence.missing_sources == [
+        "transit",
+        "cycling",
+        "collisions",
+        "building",
+    ]
 
 
 def test_confidence_is_medium_with_three_meaningful_sources():

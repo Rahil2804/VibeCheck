@@ -30,13 +30,15 @@ from backend.provenance import build_profile_provenance
 from backend.score_signals import resolve_vibe_scores
 from backend.scorer import score_fit
 from backend.sources.access import fetch_access_context
+from backend.sources.building import fetch_building_context
 from backend.sources.census import fetch_census_context
+from backend.sources.collisions import fetch_collision_context
 from backend.sources.common import SourceContext, SourceFetcher, SourceResult
+from backend.sources.cycling import fetch_cycling_context
 from backend.sources.housing import fetch_housing_context
 from backend.sources.local import fetch_local_context
 from backend.sources.mapbox import resolve_place
 from backend.sources.transit import fetch_transit_context
-from backend.sources.cycling import fetch_cycling_context
 from backend.snapshot import snapshot_health
 from backend.synthesizer import (
     PROMPT_VERSION,
@@ -46,8 +48,13 @@ from backend.synthesizer import (
 
 ProfileSynthesizer = Callable[..., Awaitable[Any]]
 logger = logging.getLogger(__name__)
-ANALYSIS_VERSION = "2026.09-grounded-evidence-v3"
-SNAPSHOT_SOURCES = {SourceName.HOUSING, SourceName.TRANSIT, SourceName.CYCLING}
+ANALYSIS_VERSION = "2026.09-global-cycling-v5"
+SNAPSHOT_SOURCES = {
+    SourceName.HOUSING,
+    SourceName.TRANSIT,
+    SourceName.COLLISIONS,
+    SourceName.BUILDING,
+}
 
 
 DEFAULT_SOURCE_FETCHERS: dict[SourceName, SourceFetcher] = {
@@ -57,6 +64,8 @@ DEFAULT_SOURCE_FETCHERS: dict[SourceName, SourceFetcher] = {
     SourceName.LOCAL: fetch_local_context,
     SourceName.TRANSIT: fetch_transit_context,
     SourceName.CYCLING: fetch_cycling_context,
+    SourceName.COLLISIONS: fetch_collision_context,
+    SourceName.BUILDING: fetch_building_context,
 }
 
 
@@ -125,6 +134,10 @@ async def analyze_neighborhood(
         contextual_signals.append("CMHC regional rent benchmark")
     if context.rent_benchmark is not None:
         contextual_signals.append("CMHC unit-matched rent benchmark")
+    if fallback_profile.collision_context is not None:
+        contextual_signals.append("Toronto reported collision history")
+    if fallback_profile.building_context is not None:
+        contextual_signals.append("Exact-address RentSafeTO record")
     supported_signals = list(
         dict.fromkeys([*coverage.supported_signals, *contextual_signals])
     )
@@ -224,6 +237,8 @@ async def analyze_neighborhood(
             "who_lives_here": fallback_profile.who_lives_here,
             "transit_context": fallback_profile.transit_context,
             "cycling_context": fallback_profile.cycling_context,
+            "collision_context": fallback_profile.collision_context,
+            "building_context": fallback_profile.building_context,
             "trajectory": None,
             "provenance": provenance,
         }
@@ -298,7 +313,17 @@ def _build_ai_evidence(
             "protected_network_km",
             "total_network_km",
             "bike_share_stations",
+            "bicycle_parking_locations",
+            "network_radius_m",
+            "method",
+            "fallback",
+            "updated_at",
+            "source_url",
+            "scope",
+            "edition",
         ),
+        SourceName.COLLISIONS: ("collision_context",),
+        SourceName.BUILDING: ("building_context",),
     }
     facts_by_check = {
         "access": _allowed_source_values(
@@ -318,6 +343,14 @@ def _build_ai_evidence(
         ),
         "cycling": _allowed_source_values(
             source_data.get(SourceName.CYCLING, {}), allowed_fields[SourceName.CYCLING]
+        ),
+        "collisions": _allowed_source_values(
+            source_data.get(SourceName.COLLISIONS, {}),
+            allowed_fields[SourceName.COLLISIONS],
+        ),
+        "building": _allowed_source_values(
+            source_data.get(SourceName.BUILDING, {}),
+            allowed_fields[SourceName.BUILDING],
         ),
         "fit": fit.model_dump(mode="json") if fit is not None else {},
     }
@@ -493,6 +526,7 @@ async def _run_source(
                 scope=source_result.scope,
                 source_url=source_result.source_url,
                 stale=source_result.stale,
+                fallback=source_result.fallback,
             ),
             {},
         )
@@ -507,6 +541,7 @@ async def _run_source(
             scope=source_result.scope,
             source_url=source_result.source_url,
             stale=source_result.stale,
+            fallback=source_result.fallback,
         ),
         source_result.data,
     )
@@ -547,6 +582,8 @@ def _build_profile(
     local = source_data.get(SourceName.LOCAL, {})
     transit = source_data.get(SourceName.TRANSIT, {})
     cycling = source_data.get(SourceName.CYCLING, {})
+    collisions = source_data.get(SourceName.COLLISIONS, {})
+    building = source_data.get(SourceName.BUILDING, {})
 
     scores = resolve_vibe_scores(source_data)
     label = place.neighborhood or place.label
@@ -605,13 +642,23 @@ def _build_profile(
             {
                 "protected_network_km": cycling.get("protected_network_km", 0),
                 "total_network_km": cycling.get("total_network_km", 0),
-                "bike_share_stations": cycling.get("bike_share_stations", 0),
+                "bike_share_stations": cycling.get("bike_share_stations"),
+                "bicycle_parking_locations": cycling.get(
+                    "bicycle_parking_locations"
+                ),
+                "network_radius_m": cycling.get("network_radius_m", 1_000),
                 "scope": cycling.get("scope", "City of Toronto"),
                 "edition": cycling.get("edition", "Bundled GTA snapshot"),
+                "method": cycling.get("method", "toronto_official"),
+                "fallback": bool(cycling.get("fallback", False)),
+                "updated_at": cycling.get("updated_at"),
+                "source_url": cycling.get("source_url"),
             }
             if cycling.get("score") is not None
             else None
         ),
+        collision_context=collisions.get("collision_context"),
+        building_context=building.get("building_context"),
     )
 
 

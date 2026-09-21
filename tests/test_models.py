@@ -5,6 +5,7 @@ from backend.models import (
     AnalyzeRequest,
     CarReliance,
     Coordinates,
+    CyclingContext,
     PreferenceProfileCreate,
     PreferenceProfileUpdate,
     ProfileProvenance,
@@ -62,7 +63,23 @@ def test_source_status_has_consistent_serializable_shape():
         "scope": None,
         "source_url": None,
         "stale": None,
+        "fallback": False,
     }
+
+
+def test_old_cycling_context_defaults_to_official_evidence_shape():
+    context = CyclingContext(
+        protected_network_km=1.2,
+        total_network_km=2.4,
+        bike_share_stations=3,
+        scope="City of Toronto",
+        edition="Legacy snapshot",
+    )
+
+    assert context.method == "toronto_official"
+    assert context.fallback is False
+    assert context.network_radius_m == 1000
+    assert context.bicycle_parking_locations is None
 
 
 def test_preference_profile_create_accepts_safe_expanded_fields():

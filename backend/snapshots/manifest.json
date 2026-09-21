@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "snapshot_id": "gta-20260918-e30a5629fc62",
+  "schema_version": 4,
+  "snapshot_id": "gta-20260918-2102886c0a18",
   "edition": "GTA evidence snapshot 2025/2026",
   "editions": {
     "transit": "Feed-specific service dates in feed_validity",
@@ -8,12 +8,14 @@
     "cycling": "City of Toronto network current at retrieval",
     "bike_share": "Station information current at retrieval",
     "toronto_profiles": "2021 Census, Toronto 158-neighbourhood model",
-    "census_subdivisions": "Statistics Canada 2021 Census Profile"
+    "census_subdivisions": "Statistics Canada 2021 Census Profile",
+    "collisions": "Toronto reported collisions, rolling five-year window",
+    "buildings": "Latest RentSafeTO registration and evaluation records"
   },
-  "created_at": "2026-09-18T02:54:20.920814+00:00",
+  "created_at": "2026-09-18T18:00:48.138293+00:00",
   "artifact": "gta_snapshot.sqlite",
-  "artifact_bytes": 13111296,
-  "artifact_sha256": "e30a5629fc626c94e9f181334966fb5761b0b6988bda4fc148086e30e7a3e56f",
+  "artifact_bytes": 44388352,
+  "artifact_sha256": "2102886c0a18b0d226bb3ab723310fd5603c721f27aef0866b2ee2f7fac48645",
   "sources": [
     {
       "name": "TTC GTFS",
@@ -119,6 +121,34 @@
       "retrieved_at": "2026-09-18T02:47:51.458028+00:00",
       "sha256": "d7f2543186935ca7d9f5a8a21ecf2084d75ccce9d15ef3cd09ce1d237c383e03",
       "bytes": 196875109
+    },
+    {
+      "name": "Toronto traffic collisions",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/ec53f7b2-769b-4914-91fe-a37ee27a90b3/resource/cb890861-ed20-4862-bb75-b1f9ec1e58dd/download/traffic-collisions-4326.csv",
+      "retrieved_at": "2026-09-18T18:00:47.805893+00:00",
+      "sha256": "ee11a52dce164aa74e00a772e948b632cbc0933d55885a1057b6feb4e89bdf97",
+      "bytes": 178222209
+    },
+    {
+      "name": "Toronto KSI collisions",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/73a8e475-9683-42e1-ac06-b8690dcba062/resource/b95f5270-4eb0-40c2-917d-37fb494328a1/download/motor-vehicle-collisions-with-ksi-data-4326.csv",
+      "retrieved_at": "2026-09-18T18:00:48.016618+00:00",
+      "sha256": "d319d43f2eb333cc0638473bb4c496b6e15f8fdc878318dcd779d7201a76b3bc",
+      "bytes": 10926547
+    },
+    {
+      "name": "RentSafeTO building registration",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/datastore/dump/3ad76a8c-0518-4df2-b94e-8c747d62f8c1",
+      "retrieved_at": "2026-09-18T18:00:48.028708+00:00",
+      "sha256": "5b7fc09105946c3064f8deb42bd8c78de669ccd8b0585dde7383717d9a629b5d",
+      "bytes": 1558588
+    },
+    {
+      "name": "RentSafeTO building evaluations",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/datastore/dump/244f7a02-da5c-425b-b55f-fbdd133dd732",
+      "retrieved_at": "2026-09-18T18:00:48.030388+00:00",
+      "sha256": "c9d2f909dffbe08a2c2a5f4c10c881aaa192e357a3ae34d04d259c7e4777c96d",
+      "bytes": 1815639
     }
   ],
   "feed_validity": [
@@ -179,5 +209,35 @@
       "name": "Open Government Licence - Canada",
       "url": "https://open.canada.ca/en/open-government-licence-canada"
     }
-  ]
+  ],
+  "partitions": {
+    "collisions_all": {
+      "retrieved_at": "2026-09-18T18:00:26.417587+00:00",
+      "data_start": "2021-01-01",
+      "data_through": "2025-12-31",
+      "stale_after_days": 548,
+      "row_count": 308188
+    },
+    "collisions_ksi": {
+      "retrieved_at": "2026-09-18T18:00:26.417587+00:00",
+      "data_start": "2021-01-01",
+      "data_through": "2026-08-29",
+      "stale_after_days": 30,
+      "row_count": 1588
+    },
+    "building_registration": {
+      "retrieved_at": "2026-09-18T18:00:43.558548+00:00",
+      "data_start": "2017",
+      "data_through": "2026-09-18",
+      "stale_after_days": 45,
+      "row_count": 3611
+    },
+    "building_evaluations": {
+      "retrieved_at": "2026-09-18T18:00:43.558548+00:00",
+      "data_start": "2023-08-15",
+      "data_through": "2026-09-17",
+      "stale_after_days": 30,
+      "row_count": 3588
+    }
+  }
 }

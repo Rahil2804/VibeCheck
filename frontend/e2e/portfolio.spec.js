@@ -33,7 +33,7 @@ async function mockApi(page, fixture = analysis, health = { status: 'ok', mapbox
     let body = {};
     if (path === '/health') body = health;
     if (path === '/preference-profiles') body = [{ id: 'p1', name: 'Transit first', is_default: true, generic_mode: false, top_priority: 'transit_access', must_haves: [], deal_breakers: [], created_at: '2026-09-16T00:00:00Z', updated_at: '2026-09-16T00:00:00Z' }];
-    if (path === '/profiles') body = [{ id: 'r1', place_label: fixture.place.label, confidence_level: 'high', source_statuses: fixture.source_statuses, analysis_lens: fixture.analysis_lens, coverage: fixture.coverage, fit_score: 71, fit_label: 'Good fit', created_at: '2026-09-16T00:00:00Z', updated_at: '2026-09-16T00:00:00Z' }];
+    if (path === '/profiles') body = [{ id: 'r1', place_label: fixture.place.label, confidence_level: 'high', source_statuses: fixture.source_statuses, analysis_lens: fixture.analysis_lens, coverage: fixture.coverage, fit_score: 71, fit_label: 'Good fit', cycling_score: fixture.profile.vibe_scores.cycling_access, cycling_evidence_method: fixture.profile.cycling_context?.method, collision_count: fixture.profile.collision_context?.total_collisions, building_match: fixture.evidence_checks?.some((check) => check.id === 'building') ? Boolean(fixture.profile.building_context) : null, building_score: fixture.profile.building_context?.current_score, created_at: '2026-09-16T00:00:00Z', updated_at: '2026-09-16T00:00:00Z' }];
     if (path === '/profiles/r1') body = { id: 'r1', place_label: fixture.place.label, confidence_level: 'high', source_statuses: fixture.source_statuses, analysis_lens: fixture.analysis_lens, coverage: fixture.coverage, created_at: '2026-09-16T00:00:00Z', updated_at: '2026-09-16T00:00:00Z', analyze_request: { query: fixture.place.label }, response: fixture };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
@@ -91,6 +91,7 @@ test('saved report restores its immutable lens and supports print', async ({ pag
   await page.locator('.saved-open').click();
   await expect(page.getByRole('heading', { name: analysis.place.label })).toBeVisible();
   await expect(page.getByText(/Analyzed with/)).toContainText('Transit first');
+  await expect(page.locator('#evidence-card-cycling')).toContainText('Unavailable');
   await expect(page.getByRole('button', { name: /Print \/ Save PDF/i })).toBeVisible();
   await expect(page.locator('.analysis-sheet')).toHaveScreenshot('analysis-sheet.png');
 });
@@ -109,7 +110,12 @@ test('saved report exposes scheduled transit, cycling, and unit-matched rent evi
   fixture.snapshot_id = 'gta-fixture';
   fixture.profile.vibe_scores.cycling_access = 82;
   fixture.profile.transit_context = { scheduled_departures_per_hour: 18, nearby_route_count: 4, nearby_routes: ['1', '2'], agencies: ['TTC'], service_date: '2026-09-15', scope: 'TTC' };
-  fixture.profile.cycling_context = { protected_network_km: 2.4, total_network_km: 4.1, bike_share_stations: 5, scope: 'City of Toronto' };
+  fixture.profile.cycling_context = { protected_network_km: 2.4, total_network_km: 4.1, bike_share_stations: 5, bicycle_parking_locations: null, network_radius_m: 1000, scope: 'City of Toronto', edition: 'Toronto Open Data 2026', method: 'toronto_official', fallback: false };
+  fixture.evidence_checks = fixture.evidence_checks.map((check) => (
+    check.id === 'cycling'
+      ? { ...check, status: 'supported', summary: 'Official Toronto cycling evidence returned.' }
+      : check
+  ));
   fixture.profile.who_lives_here.rent_benchmark = { monthly_rent: 1763, unit_size: 'one_bedroom', geography: 'Toronto', edition: 'CMHC 2025', quality_code: 'a', market_scope: 'Purpose-built rental apartments' };
   await mockApi(page, fixture);
   await page.goto('/');
@@ -117,7 +123,115 @@ test('saved report exposes scheduled transit, cycling, and unit-matched rent evi
   await page.locator('.saved-open').click();
   await expect(page.getByText(/18 departures/i)).toBeVisible();
   await expect(page.getByText(/2.4 km protected/i)).toBeVisible();
+  await expect(page.getByText(/Official Toronto/i).first()).toBeVisible();
   await expect(page.getByText('$1,763')).toBeVisible();
+});
+
+test('saved report labels stale OSM cycling evidence and preserves a real zero', async ({ page }) => {
+  const fixture = structuredClone(analysis);
+  fixture.place = { label: 'Ottawa, Ontario', coordinates: { lat: 45.4215, lng: -75.6972 } };
+  fixture.coverage = { region: 'outside_gta', level: 'limited', supported_signals: ['Cycling access'], unavailable_signals: [], message: 'Limited non-GTA evidence with a labelled OSM cycling estimate.' };
+  fixture.profile.vibe_scores.cycling_access = 0;
+  fixture.profile.cycling_context = {
+    protected_network_km: 0,
+    total_network_km: 0,
+    bike_share_stations: null,
+    bicycle_parking_locations: 2,
+    network_radius_m: 1000,
+    scope: 'OpenStreetMap mapped cycling infrastructure',
+    edition: 'OpenStreetMap live proximity query',
+    method: 'osm_fallback',
+    fallback: true,
+    updated_at: '2026-09-14T00:00:00Z',
+    source_url: 'https://www.openstreetmap.org/copyright',
+  };
+  fixture.evidence_checks = fixture.evidence_checks.map((check) => (
+    check.id === 'cycling'
+      ? { ...check, status: 'stale', summary: 'Using stale cached OSM cycling evidence.' }
+      : check
+  ));
+  await mockApi(page, fixture);
+  await page.goto('/');
+  await page.getByRole('button', { name: /Saved reports/i }).click();
+  await expect(page.getByText(/0 cycling · OSM estimate/i)).toBeVisible();
+  await page.locator('.saved-open').click();
+  const cyclingCard = page.locator('#evidence-card-cycling');
+  await expect(cyclingCard).toContainText('Stale data');
+  await expect(cyclingCard).toContainText('No mapped qualifying cycling infrastructure');
+  await expect(cyclingCard).toContainText('2 mapped bicycle-parking locations');
+  await expect(cyclingCard).toContainText('not a route, traffic-stress, or safety score');
+  await expect(page.locator('.score-card').filter({ hasText: 'Cycling access' })).toContainText('0/100');
+});
+
+test('saved report exposes collision history and an exact RentSafeTO record', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = structuredClone(analysis);
+  fixture.profile.collision_context = {
+    radius_m: 1000,
+    baseline_period_start: '2021-01-01',
+    baseline_period_end: '2025-12-31',
+    total_collisions: 42,
+    injury_collisions: 8,
+    fatal_collisions: 1,
+    pedestrian_involved_collisions: 5,
+    cyclist_involved_collisions: 3,
+    ksi_period_start: '2021-01-01',
+    ksi_period_end: '2026-08-29',
+    ksi_collisions: 6,
+    ksi_fatal_collisions: 1,
+    ksi_pedestrian_involved_collisions: 2,
+    ksi_cyclist_involved_collisions: 1,
+    severe_events: [{ collision_id: 'ksi-1', occurred_at: '2026-08-01', latitude: 43.67, longitude: -79.4 }],
+    stale: false,
+  };
+  fixture.profile.building_context = {
+    rsn: '4154972',
+    site_address: '210 WYCHWOOD AVE',
+    property_type: 'PRIVATE',
+    year_built: 1930,
+    storeys: 4,
+    units: 40,
+    evaluation_date: '2025-07-09',
+    current_score: 98,
+    proactive_score: 98,
+    reactive_deduction: 0,
+    rating: 'green',
+    areas_evaluated: 36,
+    low_rated_categories: [],
+    stale: false,
+  };
+  fixture.evidence_checks.push(
+    { id: 'collisions', label: 'Reported collision history', status: 'supported', summary: 'Reported history returned.' },
+    { id: 'building', label: 'RentSafeTO building record', status: 'supported', summary: 'Exact address matched.' },
+  );
+  await mockApi(page, fixture);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Saved', exact: true }).click();
+  await expect(page.getByText('42 reported collisions / 1 km')).toBeVisible();
+  await page.locator('.saved-open').click();
+  await expect(page.getByText('42 reported collisions')).toBeVisible();
+  await expect(page.getByText('6 KSI collisions')).toBeVisible();
+  await expect(page.getByText(/210 WYCHWOOD AVE/)).toBeVisible();
+  await expect(page.getByText(/not safety or future risk/i)).toBeVisible();
+  await expect(page.locator('.analysis-sheet')).toHaveScreenshot('road-building-mobile.png');
+});
+
+test('saved report shows a clear no-exact-building-match state', async ({ page }) => {
+  const fixture = structuredClone(analysis);
+  fixture.profile.building_context = null;
+  fixture.evidence_checks.push({
+    id: 'building',
+    label: 'RentSafeTO building record',
+    status: 'unavailable',
+    summary: 'No exact RentSafeTO record matched this address; this does not prove the building is unregistered.',
+  });
+  await mockApi(page, fixture);
+  await page.goto('/');
+  await page.getByRole('button', { name: /Saved reports/i }).click();
+  await expect(page.getByText('No exact RentSafeTO match')).toBeVisible();
+  await page.locator('.saved-open').click();
+  await expect(page.locator('#evidence-card-building')).toContainText('Unavailable');
+  await expect(page.locator('#evidence-card-building')).toContainText('does not prove');
 });
 
 test('partial evidence and grounded synthesis states stay explicit', async ({ page }) => {

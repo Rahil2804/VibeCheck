@@ -21,6 +21,7 @@ class SourceResult:
     scope: str | None = None
     source_url: str | None = None
     stale: bool | None = None
+    fallback: bool = False
 
 
 SourceFetcher = Callable[..., Awaitable[dict[str, Any] | SourceResult | None]]

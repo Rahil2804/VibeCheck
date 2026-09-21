@@ -622,6 +622,10 @@ def _summary_data(row: sqlite3.Row) -> dict[str, object]:
         if "response_json" in row.keys()
         else None
     )
+    has_building_check = bool(
+        response
+        and any(check.id == "building" for check in response.evidence_checks)
+    )
     return {
         "id": row["id"],
         "place_label": row["place_label"],
@@ -651,6 +655,36 @@ def _summary_data(row: sqlite3.Row) -> dict[str, object]:
         "fit_label": response.fit.label
         if response is not None and response.fit
         else None,
+        "collision_count": (
+            response.profile.collision_context.total_collisions
+            if response is not None and response.profile.collision_context is not None
+            else None
+        ),
+        "ksi_collision_count": (
+            response.profile.collision_context.ksi_collisions
+            if response is not None and response.profile.collision_context is not None
+            else None
+        ),
+        "building_match": (
+            response.profile.building_context is not None
+            if has_building_check
+            else None
+        ),
+        "building_score": (
+            response.profile.building_context.current_score
+            if response is not None and response.profile.building_context is not None
+            else None
+        ),
+        "cycling_score": (
+            response.profile.vibe_scores.cycling_access
+            if response is not None
+            else None
+        ),
+        "cycling_evidence_method": (
+            response.profile.cycling_context.method
+            if response is not None and response.profile.cycling_context is not None
+            else None
+        ),
     }
 
 

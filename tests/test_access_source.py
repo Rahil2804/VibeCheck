@@ -137,7 +137,9 @@ def test_build_overpass_query_is_bounded_to_radius_and_tags():
     assert "pharmacy|library|restaurant|cafe|bar|pub|fast_food" in query
     assert "bus_stop" in query
     assert "recreation_ground" in query
-    assert "out center tags;" in query
+    assert "out geom tags;" in query
+    assert 'highway="cycleway"' in query
+    assert 'amenity="bicycle_parking"' in query
 
 
 @pytest.mark.asyncio
@@ -226,14 +228,14 @@ async def test_fetch_access_context_uses_seven_day_stale_cache_on_total_failure(
     database = tmp_path / "cache.sqlite"
     monkeypatch.setenv("SQLITE_PATH", str(database))
     context = _context_with_coordinates()
-    cache_key = "osm:access:43.6540:-79.4010:1200"
+    cache_key = "osm:neighbourhood:v2:43.6540:-79.4010"
     cached_data = normalize_access_payload(
         {"elements": [_element(1, {"shop": "supermarket"})]}
     )
     set_cached_source(
         cache_key,
         {
-            "data": cached_data,
+            "data": {"access": cached_data, "cycling": {}},
             "message": cached_data["summary"],
             "updated_at": "2026-09-15T00:00:00+00:00",
             "source_url": "https://overpass-api.de/api/interpreter",

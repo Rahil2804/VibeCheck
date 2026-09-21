@@ -85,6 +85,8 @@ class SourceName(StrEnum):
     LOCAL = "local"
     TRANSIT = "transit"
     CYCLING = "cycling"
+    COLLISIONS = "collisions"
+    BUILDING = "building"
 
 
 class SourceStatusCode(StrEnum):
@@ -112,6 +114,11 @@ class EvidenceCheckStatus(StrEnum):
     STALE = "stale"
     UNAVAILABLE = "unavailable"
     ERROR = "error"
+
+
+class CyclingEvidenceMethod(StrEnum):
+    TORONTO_OFFICIAL = "toronto_official"
+    OSM_FALLBACK = "osm_fallback"
 
 
 class TrajectoryDirection(StrEnum):
@@ -261,6 +268,7 @@ class SourceStatus(BaseModel):
     scope: str | None = None
     source_url: str | None = None
     stale: bool | None = None
+    fallback: bool = False
 
 
 class ProvenanceItem(BaseModel):
@@ -355,9 +363,15 @@ class TransitContext(BaseModel):
 class CyclingContext(BaseModel):
     protected_network_km: float = Field(ge=0)
     total_network_km: float = Field(ge=0)
-    bike_share_stations: int = Field(ge=0)
+    bike_share_stations: int | None = Field(default=None, ge=0)
+    bicycle_parking_locations: int | None = Field(default=None, ge=0)
+    network_radius_m: int = Field(default=1_000, ge=1)
     scope: str
     edition: str
+    method: CyclingEvidenceMethod = CyclingEvidenceMethod.TORONTO_OFFICIAL
+    fallback: bool = False
+    updated_at: str | None = None
+    source_url: str | None = None
 
 
 class RentBenchmark(BaseModel):
@@ -374,6 +388,61 @@ class RentBenchmark(BaseModel):
     reference_year: int
     currency: str = "CAD"
     source_url: str | None = None
+
+
+class CollisionMapPoint(BaseModel):
+    collision_id: str
+    occurred_at: str
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    fatal: bool = False
+    pedestrian_involved: bool = False
+    cyclist_involved: bool = False
+    other_road_user_involved: bool = False
+
+
+class CollisionContext(BaseModel):
+    radius_m: int = Field(default=1000, gt=0)
+    baseline_period_start: str
+    baseline_period_end: str
+    total_collisions: int = Field(ge=0)
+    injury_collisions: int = Field(ge=0)
+    fatal_collisions: int = Field(ge=0)
+    pedestrian_involved_collisions: int = Field(ge=0)
+    cyclist_involved_collisions: int = Field(ge=0)
+    ksi_period_start: str
+    ksi_period_end: str
+    ksi_collisions: int = Field(ge=0)
+    ksi_fatal_collisions: int = Field(ge=0)
+    ksi_pedestrian_involved_collisions: int = Field(ge=0)
+    ksi_cyclist_involved_collisions: int = Field(ge=0)
+    severe_events: list[CollisionMapPoint] = Field(default_factory=list)
+    scope: str = "City of Toronto"
+    edition: str
+    stale: bool = False
+    baseline_source_url: str | None = None
+    ksi_source_url: str | None = None
+
+
+class BuildingContext(BaseModel):
+    rsn: str
+    site_address: str
+    property_type: str | None = None
+    year_built: int | None = Field(default=None, ge=0)
+    storeys: int | None = Field(default=None, ge=0)
+    units: int | None = Field(default=None, ge=0)
+    evaluation_date: str | None = None
+    current_score: float | None = Field(default=None, ge=0, le=100)
+    proactive_score: float | None = Field(default=None, ge=0, le=100)
+    reactive_deduction: float | None = Field(default=None, ge=0)
+    rating: str | None = Field(default=None, pattern="^(green|yellow|red)$")
+    areas_evaluated: int | None = Field(default=None, ge=0)
+    low_rated_categories: list[str] = Field(default_factory=list)
+    scope: str = "RentSafeTO registered apartment buildings"
+    edition: str
+    stale: bool = False
+    registration_source_url: str | None = None
+    evaluation_source_url: str | None = None
 
 
 class WhoLivesHere(BaseModel):
@@ -406,6 +475,8 @@ class NeighborhoodProfile(BaseModel):
     provenance: ProfileProvenance = Field(default_factory=ProfileProvenance)
     transit_context: TransitContext | None = None
     cycling_context: CyclingContext | None = None
+    collision_context: CollisionContext | None = None
+    building_context: BuildingContext | None = None
     narrative_citations: list[NarrativeCitation] = Field(default_factory=list)
 
 
@@ -481,6 +552,12 @@ class SavedProfileSummary(BaseModel):
     coverage: CoverageSummary | None = None
     fit_score: int | None = Field(default=None, ge=0, le=100)
     fit_label: str | None = None
+    collision_count: int | None = Field(default=None, ge=0)
+    ksi_collision_count: int | None = Field(default=None, ge=0)
+    building_match: bool | None = None
+    building_score: float | None = Field(default=None, ge=0, le=100)
+    cycling_score: int | None = Field(default=None, ge=0, le=100)
+    cycling_evidence_method: CyclingEvidenceMethod | None = None
 
 
 class SavedProfile(SavedProfileSummary):

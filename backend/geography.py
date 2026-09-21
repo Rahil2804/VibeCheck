@@ -68,13 +68,18 @@ def resolve_geography(place: Place) -> GeographyContext:
             coordinates and _inside(coordinates.lat, coordinates.lng, TORONTO_BOUNDS)
         )
     alias = _municipality_alias(text)
-    is_toronto = coordinate_toronto or alias in TORONTO_ALIASES
+    text_fallback_allowed = coordinates is None
+    is_toronto = coordinate_toronto or (
+        text_fallback_allowed and alias in TORONTO_ALIASES
+    )
     coordinate_gta = bool(subdivision) or bool(
         coordinates
         and not subdivision
         and _inside(coordinates.lat, coordinates.lng, GTA_BOUNDS)
     )
-    is_gta = is_toronto or coordinate_gta or alias in CSD_BY_MUNICIPALITY
+    is_gta = is_toronto or coordinate_gta or (
+        text_fallback_allowed and alias in CSD_BY_MUNICIPALITY
+    )
 
     csd_id: str | None = None
     csd_name: str | None = None
@@ -86,7 +91,7 @@ def resolve_geography(place: Place) -> GeographyContext:
     elif is_toronto:
         csd_id, csd_name = CSD_BY_MUNICIPALITY["toronto"]
         resolution = "coordinates" if coordinate_toronto else "place context"
-    elif alias in CSD_BY_MUNICIPALITY:
+    elif text_fallback_allowed and alias in CSD_BY_MUNICIPALITY:
         csd_id, csd_name = CSD_BY_MUNICIPALITY[alias]
         resolution = "place context"
     elif coordinate_gta:

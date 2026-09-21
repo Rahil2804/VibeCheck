@@ -38,6 +38,9 @@ export default function CompareResultCard({ slot, onRetry }) {
   const response = slot.response;
   if (!response) return null;
   const scores = response.profile?.vibe_scores || {};
+  const cycling = response.profile?.cycling_context;
+  const collisions = response.profile?.collision_context;
+  const building = response.profile?.building_context;
 
   return (
     <article className="compare-result-card">
@@ -60,8 +63,28 @@ export default function CompareResultCard({ slot, onRetry }) {
               {scores[key] != null && <i style={{ width: `${Math.max(0, Math.min(100, scores[key]))}%` }} />}
             </div>
             <strong>{scores[key] ?? 'Unavailable'}</strong>
+            {key === 'cycling_access' && cycling && (
+              <small>{cycling.fallback ? 'OSM estimate' : 'Official Toronto'}</small>
+            )}
           </div>
         ))}
+      </div>
+      <div className="compare-evidence-list" aria-label="Context evidence">
+        <div>
+          <span>Reported collisions · 1 km</span>
+          <strong>{collisions ? formatNumber(collisions.total_collisions) : 'Unavailable'}</strong>
+          <small>{collisions ? `${collisions.baseline_period_start}–${collisions.baseline_period_end}` : 'Toronto bundled data only'}</small>
+        </div>
+        <div>
+          <span>KSI collisions · separate series</span>
+          <strong>{collisions ? formatNumber(collisions.ksi_collisions) : 'Unavailable'}</strong>
+          <small>{collisions ? `${collisions.ksi_period_start}–${collisions.ksi_period_end}` : 'Not a safety score'}</small>
+        </div>
+        <div>
+          <span>RentSafeTO exact match</span>
+          <strong>{building ? (building.current_score == null ? 'Registered' : `${formatNumber(building.current_score)} / 100`) : 'Unavailable'}</strong>
+          <small>{building ? building.site_address : 'No exact record in this report'}</small>
+        </div>
       </div>
       <div className="compare-pros-cons">
         <div>
@@ -77,4 +100,8 @@ export default function CompareResultCard({ slot, onRetry }) {
       <Provenance provenance={response.profile?.provenance} />
     </article>
   );
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('en-CA', { maximumFractionDigits: 1 }).format(value);
 }

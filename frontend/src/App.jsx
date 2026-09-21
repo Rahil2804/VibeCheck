@@ -83,7 +83,10 @@ export default function App() {
       )}
       <section className="map-stage">
         <Suspense fallback={<div className="map-loading">Loading map…</div>}>
-          <MapView selectedPlace={selectedPlace} />
+          <MapView
+            selectedPlace={selectedPlace}
+            collisionContext={data?.profile?.collision_context}
+          />
         </Suspense>
 
         <div className="coverage-chip" aria-live="polite">

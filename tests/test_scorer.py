@@ -1,8 +1,13 @@
+import pytest
+
 from backend.models import (
     BudgetSensitivity,
     CarReliance,
+    CyclingContext,
+    CyclingEvidenceMethod,
     EnergyPreference,
     NeighborhoodProfile,
+    PreferenceCategory,
     Preferences,
     RentBenchmark,
     RentalUnitSize,
@@ -43,6 +48,27 @@ def _profile(**score_overrides) -> NeighborhoodProfile:
             summary="Signals look stable.",
         ),
     )
+
+
+def _cycling_profile(score: int, *, fallback: bool) -> NeighborhoodProfile:
+    profile = _profile(cycling_access=score)
+    profile.cycling_context = CyclingContext(
+        protected_network_km=1.2,
+        total_network_km=2.8,
+        scope=(
+            "OpenStreetMap mapped cycling infrastructure"
+            if fallback
+            else "City of Toronto"
+        ),
+        edition="Fixture",
+        method=(
+            CyclingEvidenceMethod.OSM_FALLBACK
+            if fallback
+            else CyclingEvidenceMethod.TORONTO_OFFICIAL
+        ),
+        fallback=fallback,
+    )
+    return profile
 
 
 def test_no_car_user_rewards_walkable_transit_rich_places():
@@ -188,3 +214,60 @@ def test_max_rent_never_substitutes_historical_shelter_cost_or_wrong_unit():
 
     assert fit.score is None
     assert fit.factors == []
+
+
+@pytest.mark.parametrize(("cycling_score", "expected_impact"), [(80, 8), (30, -8)])
+def test_osm_cycling_top_priority_uses_reduced_impact(
+    cycling_score,
+    expected_impact,
+):
+    fit = score_fit(
+        _cycling_profile(cycling_score, fallback=True),
+        Preferences(top_priority=TopPriority.CYCLING_ACCESS),
+    )
+
+    assert fit.factors[0].impact == expected_impact
+    assert "reduced fit weight" in fit.factors[0].explanation
+
+
+@pytest.mark.parametrize(("cycling_score", "expected_impact"), [(80, 3), (30, -2)])
+def test_osm_cycling_important_signal_uses_reduced_impact(
+    cycling_score,
+    expected_impact,
+):
+    fit = score_fit(
+        _cycling_profile(cycling_score, fallback=True),
+        Preferences(must_haves=[PreferenceCategory.CYCLING]),
+    )
+
+    assert fit.factors[0].impact == expected_impact
+
+
+def test_weak_osm_cycling_never_fails_a_non_negotiable():
+    fit = score_fit(
+        _cycling_profile(20, fallback=True),
+        Preferences(deal_breakers=[PreferenceCategory.CYCLING]),
+    )
+
+    assert fit.score == 50
+    assert fit.factors[0].impact == 0
+    assert "cannot conclusively fail" in fit.factors[0].explanation
+    assert not fit.flags
+
+
+def test_strong_osm_cycling_earns_reduced_non_negotiable_credit():
+    fit = score_fit(
+        _cycling_profile(80, fallback=True),
+        Preferences(deal_breakers=[PreferenceCategory.CYCLING]),
+    )
+
+    assert fit.factors[0].impact == 3
+
+
+def test_official_toronto_cycling_retains_full_fit_impact():
+    fit = score_fit(
+        _cycling_profile(80, fallback=False),
+        Preferences(top_priority=TopPriority.CYCLING_ACCESS),
+    )
+
+    assert fit.factors[0].impact == 15

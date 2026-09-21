@@ -39,6 +39,14 @@ export default function SavedProfiles({ open = true, profiles = [], error, onClo
                     {profile.fit_score != null && <b>{profile.fit_score} fit</b>}
                     <b>{profile.confidence_level} confidence</b>
                     {profile.coverage?.level && <b>{profile.coverage.level} coverage</b>}
+                    {profile.cycling_score != null && (
+                      <b>
+                        {profile.cycling_score} cycling · {profile.cycling_evidence_method === 'osm_fallback' ? 'OSM estimate' : 'Official Toronto'}
+                      </b>
+                    )}
+                    {profile.collision_count != null && <b>{profile.collision_count} reported collisions / 1 km</b>}
+                    {profile.building_match === true && <b>{profile.building_score == null ? 'RentSafeTO match' : `RentSafeTO ${profile.building_score}`}</b>}
+                    {profile.building_match === false && <b>No exact RentSafeTO match</b>}
                   </div>
                 </button>
                 <button type="button" className="icon-danger" aria-label={`Delete ${profile.place_label}`} onClick={() => confirmDelete(profile)}>

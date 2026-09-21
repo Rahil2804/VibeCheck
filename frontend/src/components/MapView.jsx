@@ -6,13 +6,14 @@ import { MAPBOX_TOKEN } from '../utils/mapbox.js';
 const DEFAULT_CENTER = [-79.3832, 43.6532];
 const RADIUS_MILES = 0.5;
 
-export default function MapView({ selectedPlace }) {
+export default function MapView({ selectedPlace, collisionContext }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const [loadState, setLoadState] = useState(MAPBOX_TOKEN ? 'loading' : 'missing');
   const [loadError, setLoadError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [showKsi, setShowKsi] = useState(true);
 
   useEffect(() => {
     if (!MAPBOX_TOKEN || !containerRef.current || mapRef.current) return undefined;
@@ -112,6 +113,41 @@ export default function MapView({ selectedPlace }) {
     else map.once('load', drawRadius);
   }, [attempt, selectedPlace]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    function drawKsiEvents() {
+      const data = collisionPoints(collisionContext);
+      const source = map.getSource('ksi-collisions');
+      if (source) {
+        source.setData(data);
+      } else {
+        map.addSource('ksi-collisions', { type: 'geojson', data });
+        map.addLayer({
+          id: 'ksi-collision-points',
+          type: 'circle',
+          source: 'ksi-collisions',
+          paint: {
+            'circle-color': ['case', ['==', ['get', 'fatal'], true], '#E7674C', '#2457F5'],
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 15, 7],
+            'circle-opacity': 0.78,
+            'circle-stroke-color': '#F4F0E8',
+            'circle-stroke-width': 1.5,
+          },
+        });
+      }
+      map.setLayoutProperty(
+        'ksi-collision-points',
+        'visibility',
+        showKsi && data.features.length ? 'visible' : 'none',
+      );
+    }
+
+    if (map.isStyleLoaded()) drawKsiEvents();
+    else map.once('load', drawKsiEvents);
+  }, [attempt, collisionContext, showKsi]);
+
   if (!MAPBOX_TOKEN) {
     return <div className="map-token-state">Add VITE_MAPBOX_TOKEN to render the Toronto map.</div>;
   }
@@ -119,6 +155,16 @@ export default function MapView({ selectedPlace }) {
   return (
     <>
       <div className="map-view" ref={containerRef} aria-hidden="true" />
+      {collisionContext?.severe_events?.length > 0 && loadState === 'ready' && (
+        <button
+          type="button"
+          className="map-layer-toggle"
+          aria-pressed={showKsi}
+          onClick={() => setShowKsi((value) => !value)}
+        >
+          {showKsi ? 'Hide' : 'Show'} KSI collision points
+        </button>
+      )}
       {loadState === 'loading' && <div className="map-loading" role="status">Loading the Toronto map…</div>}
       {loadState === 'error' && (
         <div className="map-error-state" role="alert">
@@ -131,6 +177,26 @@ export default function MapView({ selectedPlace }) {
       )}
     </>
   );
+}
+
+function collisionPoints(context) {
+  return {
+    type: 'FeatureCollection',
+    features: (context?.severe_events || []).map((event) => ({
+      type: 'Feature',
+      id: event.collision_id,
+      geometry: {
+        type: 'Point',
+        coordinates: [event.longitude, event.latitude],
+      },
+      properties: {
+        occurred_at: event.occurred_at,
+        fatal: Boolean(event.fatal),
+        pedestrian_involved: Boolean(event.pedestrian_involved),
+        cyclist_involved: Boolean(event.cyclist_involved),
+      },
+    })),
+  };
 }
 
 function readableMapError(error) {

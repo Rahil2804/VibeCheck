@@ -27,12 +27,19 @@ Every statement must cite one or more evidence check IDs supplied in the input.
 Explain the deterministic fit and preferences without changing any score or metric.
 Mark stale or fallback evidence clearly. Do not infer crime, safety, protected classes,
 demographics, noise, sentiment, development trajectory, schools, or unsupported facts.
+Collision evidence may only be described as reported historical counts; never infer safety,
+danger, causation, or future risk. RentSafeTO evidence describes the matched building's
+official registration and common-area evaluation only, not units, residents, or its area.
+Cycling evidence describes mapped infrastructure only; never call an area comfortable or
+routable from these facts.
 Return one overview, one to three pros, and one to three cons."""
 PROMPT_VERSION = "grounded-neighbourhood-v1"
 FORBIDDEN_CLAIM_PATTERN = re.compile(
     r"\b(crime|safe(?:ty)?|dangerous|racial|race|ethnic|demographic|religio\w*|"
     r"disab\w*|famil(?:y|ies|ial)|national origin|gender|sex(?:ual)?|income|"
-    r"noise|quiet|sentiment|gentrif\w*|development trajectory|school ranking)\b",
+    r"noise|quiet|sentiment|gentrif\w*|development trajectory|school ranking|"
+    r"risk\w*|caus(?:e|es|ed|ing|ation|al)\w*|neighbou?rhood quality|"
+    r"resident characteristics|comfort\w*|routab\w*)\b",
     re.IGNORECASE,
 )
 NUMBER_PATTERN = re.compile(r"\b\d+(?:[.,]\d+)?\b")

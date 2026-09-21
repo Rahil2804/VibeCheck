@@ -63,6 +63,18 @@ def build_profile_provenance(
             SourceName.HOUSING,
             "rent_benchmark",
         ),
+        (
+            "context.collision_history",
+            "Reported collision history within 1 km",
+            SourceName.COLLISIONS,
+            "collision_context",
+        ),
+        (
+            "context.building_record",
+            "Exact-address RentSafeTO building record",
+            SourceName.BUILDING,
+            "building_context",
+        ),
     )
     items.extend(
         _field_item(
@@ -91,6 +103,8 @@ def _overview_item(
         SourceName.HOUSING,
         SourceName.CENSUS,
         SourceName.LOCAL,
+        SourceName.COLLISIONS,
+        SourceName.BUILDING,
     )
     available = [source for source in tracked_sources if _has_data(source_data, source)]
     if available:
@@ -157,12 +171,20 @@ def _score_item(
 ) -> ProvenanceItem:
     fields = score_support.get(score_key, [])
     if fields:
+        sources = _sources_from_source_fields(fields)
+        qualifiers = [
+            "stale" if status_by_source[source].stale else "fallback"
+            for source in sources
+            if source in status_by_source
+            and (status_by_source[source].stale or status_by_source[source].fallback)
+        ]
+        qualifier = f" ({'/'.join(dict.fromkeys(qualifiers))} evidence)" if qualifiers else ""
         return ProvenanceItem(
             claim_id=claim_id,
             label=label,
-            summary=f"Based on normalized {', '.join(fields)} signals.",
+            summary=f"Based on normalized {', '.join(fields)} signals{qualifier}.",
             support=ProvenanceSupport.INFERRED,
-            sources=_sources_from_source_fields(fields),
+            sources=sources,
             source_fields=fields,
         )
 
@@ -187,6 +209,8 @@ def _sources_from_source_fields(fields: list[str]) -> list[SourceName]:
         SourceName.HOUSING,
         SourceName.CENSUS,
         SourceName.LOCAL,
+        SourceName.COLLISIONS,
+        SourceName.BUILDING,
     ]
     present = {field.split(".", maxsplit=1)[0] for field in fields}
     return [source for source in ordered_sources if source.value in present]

@@ -5,7 +5,7 @@ import json
 import os
 import sqlite3
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +13,28 @@ from typing import Any
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 DEFAULT_SNAPSHOT_PATH = SNAPSHOT_DIR / "gta_snapshot.sqlite"
 DEFAULT_MANIFEST_PATH = SNAPSHOT_DIR / "manifest.json"
-SNAPSHOT_SCHEMA_VERSION = 3
+SNAPSHOT_SCHEMA_VERSION = 4
+
+SNAPSHOT_TABLES = (
+    "transit_stop_service",
+    "rent_benchmarks",
+    "cycling_segments",
+    "bike_share_stations",
+    "toronto_neighbourhood_profiles",
+    "census_subdivisions",
+    "toronto_collisions",
+    "toronto_ksi_collisions",
+    "toronto_buildings",
+)
+PARTITION_TABLES = {
+    "collisions_all": "toronto_collisions",
+    "collisions_ksi": "toronto_ksi_collisions",
+    "building_registration": "toronto_buildings",
+}
+REQUIRED_PARTITIONS = {
+    *PARTITION_TABLES,
+    "building_evaluations",
+}
 
 
 @dataclass(frozen=True)
@@ -88,18 +109,12 @@ def validate_snapshot(paths: SnapshotPaths | None = None) -> list[str]:
                     "SELECT name FROM sqlite_master WHERE type = 'table'"
                 )
             }
-            required = {
-                "feed_status",
-                "transit_stop_service",
-                "rent_benchmarks",
-                "cycling_segments",
-                "bike_share_stations",
-                "toronto_neighbourhood_profiles",
-                "census_subdivisions",
-            }
+            required = {"feed_status", *SNAPSHOT_TABLES}
             missing = sorted(required - tables)
             if missing:
                 errors.append("Snapshot tables are missing: " + ", ".join(missing))
+            else:
+                _validate_partitions(manifest, connection, errors)
         finally:
             connection.close()
     except sqlite3.Error:
@@ -118,14 +133,7 @@ def snapshot_health(paths: SnapshotPaths | None = None) -> dict[str, Any]:
         connection = snapshot_connection(selected)
         if connection is not None:
             try:
-                for table in (
-                    "transit_stop_service",
-                    "rent_benchmarks",
-                    "cycling_segments",
-                    "bike_share_stations",
-                    "toronto_neighbourhood_profiles",
-                    "census_subdivisions",
-                ):
+                for table in SNAPSHOT_TABLES:
                     tables[table] = int(
                         connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[
                             0
@@ -147,6 +155,7 @@ def snapshot_health(paths: SnapshotPaths | None = None) -> dict[str, Any]:
         "artifact_bytes": size,
         "tables": tables,
         "feed_validity": feed_validity,
+        "partitions": manifest.get("partitions", {}) if manifest else {},
         "stale": _manifest_is_stale(manifest),
         "errors": errors,
     }
@@ -175,6 +184,62 @@ def parse_date(value: str | None) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def partition_is_stale(manifest: dict[str, Any] | None, *names: str) -> bool:
+    if manifest is None:
+        return True
+    partitions = manifest.get("partitions")
+    if not isinstance(partitions, dict):
+        return True
+    now = datetime.now(UTC)
+    for name in names:
+        item = partitions.get(name)
+        if not isinstance(item, dict):
+            return True
+        retrieved = parse_date(item.get("retrieved_at"))
+        stale_after_days = item.get("stale_after_days")
+        if retrieved is None or not isinstance(stale_after_days, int):
+            return True
+        if retrieved.tzinfo is None:
+            retrieved = retrieved.replace(tzinfo=UTC)
+        if retrieved + timedelta(days=stale_after_days) < now:
+            return True
+    return False
+
+
+def _validate_partitions(
+    manifest: dict[str, Any],
+    connection: sqlite3.Connection,
+    errors: list[str],
+) -> None:
+    partitions = manifest.get("partitions")
+    if not isinstance(partitions, dict):
+        errors.append("Snapshot partition metadata is missing.")
+        return
+    missing = sorted(REQUIRED_PARTITIONS - partitions.keys())
+    if missing:
+        errors.append("Snapshot partitions are missing: " + ", ".join(missing))
+        return
+    required_fields = {
+        "retrieved_at",
+        "data_start",
+        "data_through",
+        "stale_after_days",
+        "row_count",
+    }
+    for name in sorted(REQUIRED_PARTITIONS):
+        partition = partitions.get(name)
+        if not isinstance(partition, dict) or not required_fields <= partition.keys():
+            errors.append(f"Snapshot partition metadata is invalid: {name}.")
+    for name, table in PARTITION_TABLES.items():
+        partition = partitions.get(name)
+        if not isinstance(partition, dict):
+            continue
+        expected = partition.get("row_count")
+        actual = connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        if not isinstance(expected, int) or expected != actual:
+            errors.append(f"Snapshot partition row count does not match: {name}.")
 
 
 def _manifest_is_stale(manifest: dict[str, Any] | None) -> bool:

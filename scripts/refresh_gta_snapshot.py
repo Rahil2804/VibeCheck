@@ -7,6 +7,7 @@ import io
 import json
 import math
 import os
+import re
 import shutil
 import sqlite3
 import tempfile
@@ -19,7 +20,13 @@ from typing import Any, Iterable
 import httpx
 from openpyxl import load_workbook
 
-from backend.snapshot import SNAPSHOT_SCHEMA_VERSION, sha256_file
+from backend.snapshot import (
+    SNAPSHOT_SCHEMA_VERSION,
+    SnapshotPaths,
+    sha256_file,
+    validate_snapshot,
+)
+from backend.sources.building import parse_address
 from backend.sources.ontario.toronto_profiles import (
     TORONTO_NEIGHBOURHOODS_URL,
     TORONTO_PROFILE_WORKBOOK_URL,
@@ -52,6 +59,25 @@ CSD_BOUNDARY_SERVICES = (
 CENSUS_PROFILE_DOWNLOAD_URL = (
     "https://www12.statcan.gc.ca/census-recensement/2021/dp-pd/prof/details/"
     "download-telecharger/comp/getFile.cfm?LANG=E&GEONO=005&FILETYPE=CSV"
+)
+TRAFFIC_COLLISIONS_URL = (
+    "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
+    "ec53f7b2-769b-4914-91fe-a37ee27a90b3/resource/"
+    "cb890861-ed20-4862-bb75-b1f9ec1e58dd/download/traffic-collisions-4326.csv"
+)
+KSI_COLLISIONS_URL = (
+    "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
+    "73a8e475-9683-42e1-ac06-b8690dcba062/resource/"
+    "b95f5270-4eb0-40c2-917d-37fb494328a1/download/"
+    "motor-vehicle-collisions-with-ksi-data-4326.csv"
+)
+BUILDING_REGISTRATION_URL = (
+    "https://ckan0.cf.opendata.inter.prod-toronto.ca/datastore/dump/"
+    "3ad76a8c-0518-4df2-b94e-8c747d62f8c1"
+)
+BUILDING_EVALUATION_URL = (
+    "https://ckan0.cf.opendata.inter.prod-toronto.ca/datastore/dump/"
+    "244f7a02-da5c-425b-b55f-fbdd133dd732"
 )
 GTFS_FEEDS = {
     "TTC": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/7795b45e-e65a-4465-81fc-c36b9dfff169/resource/cfb6b2b8-6191-41e3-bda1-b175c51148cb/download/opendata_ttc_schedules.zip",
@@ -161,9 +187,18 @@ def main() -> None:
         type=Path,
         help="Atomically re-normalize CMHC rows from an already downloaded official workbook.",
     )
+    parser.add_argument(
+        "--only",
+        choices=("road-buildings",),
+        help="Refresh only Toronto collision and RentSafeTO partitions.",
+    )
     args = parser.parse_args()
+    if args.cmhc_workbook and args.only:
+        parser.error("--cmhc-workbook and --only cannot be used together")
     if args.cmhc_workbook:
         replace_cmhc_snapshot(args.output, args.cmhc_workbook)
+    elif args.only == "road-buildings":
+        refresh_road_buildings_snapshot(args.output, timeout=args.timeout)
     else:
         refresh_snapshot(args.output, timeout=args.timeout)
     print(f"Snapshot ready: {args.output}")
@@ -191,6 +226,10 @@ def refresh_snapshot(output: Path, *, timeout: float = 90) -> None:
             toronto_profiles = _download(client, TORONTO_PROFILE_WORKBOOK_URL)
             csd_boundaries, csd_boundaries_url = _download_csd_boundaries(client)
             census_profiles = _download(client, CENSUS_PROFILE_DOWNLOAD_URL)
+            traffic_collisions = _download(client, TRAFFIC_COLLISIONS_URL)
+            ksi_collisions = _download(client, KSI_COLLISIONS_URL)
+            building_registration = _download(client, BUILDING_REGISTRATION_URL)
+            building_evaluations = _download(client, BUILDING_EVALUATION_URL)
             station_url = _station_information_url(json.loads(bike_catalogue))
             stations = _download(client, station_url)
             resources.extend(
@@ -225,6 +264,26 @@ def refresh_snapshot(output: Path, *, timeout: float = 90) -> None:
                         CENSUS_PROFILE_DOWNLOAD_URL,
                         census_profiles,
                     ),
+                    _resource_record(
+                        "Toronto traffic collisions",
+                        TRAFFIC_COLLISIONS_URL,
+                        traffic_collisions,
+                    ),
+                    _resource_record(
+                        "Toronto KSI collisions",
+                        KSI_COLLISIONS_URL,
+                        ksi_collisions,
+                    ),
+                    _resource_record(
+                        "RentSafeTO building registration",
+                        BUILDING_REGISTRATION_URL,
+                        building_registration,
+                    ),
+                    _resource_record(
+                        "RentSafeTO building evaluations",
+                        BUILDING_EVALUATION_URL,
+                        building_evaluations,
+                    ),
                 ]
             )
 
@@ -246,6 +305,12 @@ def refresh_snapshot(output: Path, *, timeout: float = 90) -> None:
                 connection,
                 json.loads(csd_boundaries),
                 census_profiles,
+            )
+            collision_partitions = normalize_collision_data(
+                connection, traffic_collisions, ksi_collisions
+            )
+            building_partitions = normalize_building_data(
+                connection, building_registration, building_evaluations
             )
             connection.execute("ANALYZE")
             connection.commit()
@@ -277,6 +342,8 @@ def refresh_snapshot(output: Path, *, timeout: float = 90) -> None:
                 "bike_share": "Station information current at retrieval",
                 "toronto_profiles": "2021 Census, Toronto 158-neighbourhood model",
                 "census_subdivisions": "Statistics Canada 2021 Census Profile",
+                "collisions": "Toronto reported collisions, rolling five-year window",
+                "buildings": "Latest RentSafeTO registration and evaluation records",
             },
             "created_at": datetime.now(UTC).isoformat(),
             "artifact": output.name,
@@ -284,6 +351,7 @@ def refresh_snapshot(output: Path, *, timeout: float = 90) -> None:
             "artifact_sha256": sha256_file(database),
             "sources": resources,
             "feed_validity": feed_validity,
+            "partitions": {**collision_partitions, **building_partitions},
             "licences": [
                 {
                     "name": "Open Government Licence - Toronto",
@@ -365,6 +433,458 @@ def replace_cmhc_snapshot(output: Path, workbook_path: Path) -> None:
     finally:
         database.unlink(missing_ok=True)
         manifest_path.unlink(missing_ok=True)
+
+
+def refresh_road_buildings_snapshot(output: Path, *, timeout: float = 90) -> None:
+    """Atomically replace only the Toronto road and building partitions."""
+    output = output.resolve()
+    manifest_target = output.with_name("manifest.json")
+    errors = validate_snapshot(SnapshotPaths(output, manifest_target))
+    if errors and not _is_valid_partition_refresh_base(output, manifest_target):
+        raise ValueError(
+            "A valid current snapshot is required for a partition refresh: "
+            + "; ".join(errors)
+        )
+    database = _staging_file(output)
+    manifest_path = _staging_file(manifest_target)
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+            traffic_collisions = _download(client, TRAFFIC_COLLISIONS_URL)
+            ksi_collisions = _download(client, KSI_COLLISIONS_URL)
+            building_registration = _download(client, BUILDING_REGISTRATION_URL)
+            building_evaluations = _download(client, BUILDING_EVALUATION_URL)
+
+        shutil.copyfile(output, database)
+        manifest = json.loads(manifest_target.read_text(encoding="utf-8"))
+        connection = sqlite3.connect(database)
+        try:
+            _create_road_building_schema(connection)
+            for table in (
+                "toronto_collisions",
+                "toronto_ksi_collisions",
+                "toronto_buildings",
+            ):
+                connection.execute(f"DELETE FROM {table}")
+            collision_partitions = normalize_collision_data(
+                connection, traffic_collisions, ksi_collisions
+            )
+            building_partitions = normalize_building_data(
+                connection, building_registration, building_evaluations
+            )
+            connection.execute("ANALYZE")
+            connection.commit()
+            connection.execute("VACUUM")
+        finally:
+            connection.close()
+
+        if database.stat().st_size > MAX_ARTIFACT_BYTES:
+            raise ValueError("Normalized artifact exceeds the 50 MB repository budget.")
+        source_names = {
+            "Toronto traffic collisions",
+            "Toronto KSI collisions",
+            "RentSafeTO building registration",
+            "RentSafeTO building evaluations",
+        }
+        resources = [
+            item
+            for item in manifest.get("sources", [])
+            if item.get("name") not in source_names
+        ]
+        resources.extend(
+            [
+                _resource_record(
+                    "Toronto traffic collisions",
+                    TRAFFIC_COLLISIONS_URL,
+                    traffic_collisions,
+                ),
+                _resource_record(
+                    "Toronto KSI collisions", KSI_COLLISIONS_URL, ksi_collisions
+                ),
+                _resource_record(
+                    "RentSafeTO building registration",
+                    BUILDING_REGISTRATION_URL,
+                    building_registration,
+                ),
+                _resource_record(
+                    "RentSafeTO building evaluations",
+                    BUILDING_EVALUATION_URL,
+                    building_evaluations,
+                ),
+            ]
+        )
+        partitions = dict(manifest.get("partitions", {}))
+        partitions.update(collision_partitions)
+        partitions.update(building_partitions)
+        editions = dict(manifest.get("editions", {}))
+        editions.update(
+            {
+                "collisions": "Toronto reported collisions, rolling five-year window",
+                "buildings": "Latest RentSafeTO registration and evaluation records",
+            }
+        )
+        manifest.update(
+            {
+                "schema_version": SNAPSHOT_SCHEMA_VERSION,
+                "snapshot_id": (
+                    f"gta-{datetime.now(UTC):%Y%m%d}-{sha256_file(database)[:12]}"
+                ),
+                "created_at": datetime.now(UTC).isoformat(),
+                "artifact_bytes": database.stat().st_size,
+                "artifact_sha256": sha256_file(database),
+                "sources": resources,
+                "partitions": partitions,
+                "editions": editions,
+            }
+        )
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        _validate_built_snapshot(database)
+        os.replace(database, output)
+        os.replace(manifest_path, manifest_target)
+    finally:
+        database.unlink(missing_ok=True)
+        manifest_path.unlink(missing_ok=True)
+
+
+def _is_valid_partition_refresh_base(database: Path, manifest_path: Path) -> bool:
+    """Accept the previous schema only for an atomic road/building upgrade."""
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("schema_version") not in {3, SNAPSHOT_SCHEMA_VERSION}:
+            return False
+        if manifest.get("artifact_sha256") != sha256_file(database):
+            return False
+        connection = sqlite3.connect(
+            f"{database.resolve().as_uri()}?mode=ro", uri=True
+        )
+        try:
+            if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                return False
+            present = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            }
+        finally:
+            connection.close()
+    except (OSError, ValueError, sqlite3.Error, json.JSONDecodeError):
+        return False
+    required = {
+        "feed_status",
+        "transit_stop_service",
+        "rent_benchmarks",
+        "cycling_segments",
+        "bike_share_stations",
+        "toronto_neighbourhood_profiles",
+        "census_subdivisions",
+    }
+    return required <= present
+
+
+def normalize_collision_data(
+    connection: sqlite3.Connection,
+    traffic_content: bytes,
+    ksi_content: bytes,
+) -> dict[str, dict[str, Any]]:
+    traffic_rows = _content_csv_rows(traffic_content)
+    complete_years = sorted(
+        {
+            year
+            for row in traffic_rows
+            if (year := _optional_int(row.get("OCC_YEAR"))) is not None
+            and year < datetime.now(UTC).year
+        }
+    )
+    if not complete_years:
+        raise ValueError("Toronto traffic-collision data has no complete years.")
+    last_year = complete_years[-1]
+    first_year = last_year - 4
+    inserted_dates: list[str] = []
+    for row in traffic_rows:
+        year = _optional_int(row.get("OCC_YEAR"))
+        lat = _float(row.get("LAT_WGS84"))
+        lng = _float(row.get("LONG_WGS84"))
+        if year is None or not first_year <= year <= last_year or lat is None or lng is None:
+            continue
+        occurred_at = _collision_datetime(row.get("OCC_DATE"), year)
+        collision_id = str(row.get("_id") or "").strip()
+        if not collision_id or occurred_at is None:
+            continue
+        inserted_dates.append(occurred_at)
+        connection.execute(
+            "INSERT INTO toronto_collisions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                collision_id,
+                occurred_at,
+                lat,
+                lng,
+                int(_yes(row.get("INJURY_COLLISIONS"))),
+                int((_optional_int(row.get("FATALITIES")) or 0) > 0),
+                int(_yes(row.get("PEDESTRIAN"))),
+                int(_yes(row.get("BICYCLE"))),
+            ),
+        )
+    if not inserted_dates:
+        raise ValueError("Toronto traffic-collision normalization returned no rows.")
+
+    events: dict[str, dict[str, Any]] = {}
+    for row in _content_csv_rows(ksi_content):
+        collision_id = str(row.get("collision_id") or "").strip()
+        occurred_at = _collision_datetime(row.get("accdate"), None)
+        lat = _float(row.get("latitude"))
+        lng = _float(row.get("longitude"))
+        if not collision_id or occurred_at is None or lat is None or lng is None:
+            continue
+        if int(occurred_at[:4]) < first_year:
+            continue
+        event = events.setdefault(
+            collision_id,
+            {
+                "occurred_at": occurred_at,
+                "lat": lat,
+                "lng": lng,
+                "fatal": False,
+                "pedestrian": False,
+                "cyclist": False,
+                "other": False,
+            },
+        )
+        event["fatal"] = event["fatal"] or str(row.get("acclass") or "").strip().casefold() == "fatal"
+        event["pedestrian"] = event["pedestrian"] or _true(row.get("pedestrian"))
+        event["cyclist"] = event["cyclist"] or _true(row.get("cyclist"))
+        event["other"] = event["other"] or _true(row.get("motorcyclist")) or _true(
+            row.get("other_micromobility")
+        )
+    for collision_id, event in events.items():
+        connection.execute(
+            "INSERT INTO toronto_ksi_collisions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                collision_id,
+                event["occurred_at"],
+                event["lat"],
+                event["lng"],
+                int(event["fatal"]),
+                int(event["pedestrian"]),
+                int(event["cyclist"]),
+                int(event["other"]),
+            ),
+        )
+    if not events:
+        raise ValueError("Toronto KSI collision normalization returned no rows.")
+
+    now = datetime.now(UTC).isoformat()
+    ksi_dates = [event["occurred_at"] for event in events.values()]
+    return {
+        "collisions_all": _partition_record(
+            now, min(inserted_dates)[:10], max(inserted_dates)[:10], 548, len(inserted_dates)
+        ),
+        "collisions_ksi": _partition_record(
+            now, min(ksi_dates)[:10], max(ksi_dates)[:10], 30, len(events)
+        ),
+    }
+
+
+def normalize_building_data(
+    connection: sqlite3.Connection,
+    registration_content: bytes,
+    evaluation_content: bytes,
+) -> dict[str, dict[str, Any]]:
+    evaluations: dict[str, dict[str, str]] = {}
+    for row in _content_csv_rows(evaluation_content):
+        rsn = str(_row_value(row, "RSN") or "").strip()
+        evaluated = str(
+            _row_value(row, "EVALUATION COMPLETED ON") or ""
+        ).strip()
+        if not rsn or not evaluated:
+            continue
+        current = evaluations.get(rsn)
+        current_date = (
+            str(_row_value(current, "EVALUATION COMPLETED ON") or "")
+            if current
+            else ""
+        )
+        if current is None or evaluated > current_date:
+            evaluations[rsn] = row
+
+    inserted = 0
+    evaluation_dates: list[str] = []
+    for row in _content_csv_rows(registration_content):
+        rsn = str(_row_value(row, "RSN") or "").strip()
+        site_address = str(_row_value(row, "SITE ADDRESS") or "").strip()
+        parsed = parse_address(site_address)
+        if not rsn or not site_address or parsed is None:
+            continue
+        evaluation = evaluations.get(rsn, {})
+        evaluation_date = _text(
+            _row_value(evaluation, "EVALUATION COMPLETED ON")
+        )
+        if evaluation_date:
+            evaluation_dates.append(evaluation_date)
+        low_rated = sorted(
+            _evaluation_label(field)
+            for field, value in evaluation.items()
+            if _column_key(field) not in BUILDING_EVALUATION_METADATA_FIELDS
+            and str(value or "").strip() == "1"
+        )
+        reactive_score = _float(_row_value(evaluation, "CURRENT REACTIVE SCORE"))
+        connection.execute(
+            "INSERT INTO toronto_buildings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                rsn,
+                parsed.civic_start,
+                parsed.civic_end,
+                parsed.street_key,
+                site_address,
+                _text(
+                    _row_value(row, "PROPERTY TYPE")
+                    or _row_value(evaluation, "PROPERTY TYPE")
+                ),
+                _optional_int(
+                    _row_value(row, "CONFIRMED YEAR BUILT", "YEAR BUILT")
+                    or _row_value(evaluation, "YEAR BUILT")
+                ),
+                _optional_int(
+                    _row_value(row, "CONFIRMED STOREYS", "NO OF STOREYS")
+                    or _row_value(evaluation, "CONFIRMED STOREYS")
+                ),
+                _optional_int(
+                    _row_value(row, "CONFIRMED UNITS", "NO OF UNITS")
+                    or _row_value(evaluation, "CONFIRMED UNITS")
+                ),
+                evaluation_date,
+                _float(_row_value(evaluation, "CURRENT BUILDING EVAL SCORE")),
+                _float(_row_value(evaluation, "PROACTIVE BUILDING SCORE")),
+                abs(reactive_score) if reactive_score is not None else None,
+                _optional_int(_row_value(evaluation, "NO OF AREAS EVALUATED")),
+                json.dumps(low_rated),
+            ),
+        )
+        inserted += 1
+    if inserted == 0:
+        raise ValueError("RentSafeTO normalization returned no buildings.")
+    now = datetime.now(UTC).isoformat()
+    registration_dates = [
+        str(_row_value(row, "YEAR REGISTERED"))
+        for row in _content_csv_rows(registration_content)
+        if _row_value(row, "YEAR REGISTERED")
+    ]
+    return {
+        "building_registration": _partition_record(
+            now,
+            min(registration_dates) if registration_dates else None,
+            now[:10],
+            45,
+            inserted,
+        ),
+        "building_evaluations": _partition_record(
+            now,
+            min(evaluation_dates) if evaluation_dates else None,
+            max(evaluation_dates) if evaluation_dates else None,
+            30,
+            len(evaluations),
+        ),
+    }
+
+
+BUILDING_EVALUATION_METADATA_FIELDS = {
+    re.sub(r"[^A-Z0-9]+", " ", value.upper()).strip()
+    for value in {
+        "_id",
+        "RSN",
+        "YEAR REGISTERED",
+        "YEAR BUILT",
+        "YEAR EVALUATED",
+        "PROPERTY TYPE",
+        "WARD",
+        "WARDNAME",
+        "SITE ADDRESS",
+        "CONFIRMED STOREYS",
+        "CONFIRMED UNITS",
+        "EVALUATION COMPLETED ON",
+        "CURRENT BUILDING EVAL SCORE",
+        "PROACTIVE BUILDING SCORE",
+        "CURRENT REACTIVE SCORE",
+        "NO OF AREAS EVALUATED",
+        "GRID",
+        "LATITUDE",
+        "LONGITUDE",
+        "X",
+        "Y",
+    }
+}
+
+
+def _content_csv_rows(content: bytes) -> list[dict[str, str]]:
+    text = content.decode("utf-8-sig")
+    return list(csv.DictReader(io.StringIO(text)))
+
+
+def _column_key(value: str) -> str:
+    return re.sub(r"[^A-Z0-9]+", " ", value.upper()).strip()
+
+
+def _row_value(row: dict[str, Any], *names: str) -> Any:
+    values = {_column_key(key): value for key, value in row.items()}
+    for name in names:
+        value = values.get(_column_key(name))
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _collision_datetime(value: Any, fallback_year: int | None) -> str | None:
+    raw = str(value or "").strip()
+    if raw:
+        try:
+            if raw.isdigit():
+                return datetime.fromtimestamp(int(raw) / 1000, UTC).isoformat()
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).isoformat()
+        except (OverflowError, OSError, ValueError):
+            pass
+    return f"{fallback_year:04d}-01-01T00:00:00+00:00" if fallback_year else None
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        return int(float(str(value).replace(",", "")))
+    except (TypeError, ValueError):
+        return None
+
+
+def _yes(value: Any) -> bool:
+    return str(value or "").strip().casefold() in {"yes", "y", "true", "1"}
+
+
+def _true(value: Any) -> bool:
+    return str(value or "").strip().casefold() in {"true", "yes", "y", "1"}
+
+
+def _evaluation_label(value: str) -> str:
+    return (
+        value.replace("INT.", "Interior")
+        .replace("EXT.", "Exterior")
+        .replace("/", " / ")
+        .replace("_", " ")
+        .title()
+    )
+
+
+def _partition_record(
+    retrieved_at: str,
+    data_start: str | None,
+    data_through: str | None,
+    stale_after_days: int,
+    row_count: int,
+) -> dict[str, Any]:
+    return {
+        "retrieved_at": retrieved_at,
+        "data_start": data_start,
+        "data_through": data_through,
+        "stale_after_days": stale_after_days,
+        "row_count": row_count,
+    }
 
 
 def _staging_file(target: Path) -> Path:
@@ -771,6 +1291,39 @@ def _census_number(value: str) -> int | float | None:
     return int(number) if number.is_integer() else number
 
 
+def _create_road_building_schema(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS toronto_collisions (
+            collision_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL,
+            lat REAL NOT NULL, lng REAL NOT NULL, injury INTEGER NOT NULL,
+            fatal INTEGER NOT NULL, pedestrian_involved INTEGER NOT NULL,
+            cyclist_involved INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS collision_location_idx
+            ON toronto_collisions(lat, lng);
+        CREATE TABLE IF NOT EXISTS toronto_ksi_collisions (
+            collision_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL,
+            lat REAL NOT NULL, lng REAL NOT NULL, fatal INTEGER NOT NULL,
+            pedestrian_involved INTEGER NOT NULL, cyclist_involved INTEGER NOT NULL,
+            other_road_user_involved INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ksi_collision_location_idx
+            ON toronto_ksi_collisions(lat, lng);
+        CREATE TABLE IF NOT EXISTS toronto_buildings (
+            rsn TEXT PRIMARY KEY, civic_start INTEGER NOT NULL,
+            civic_end INTEGER NOT NULL, street_key TEXT NOT NULL,
+            site_address TEXT NOT NULL, property_type TEXT, year_built INTEGER,
+            storeys INTEGER, units INTEGER, evaluation_date TEXT,
+            current_score REAL, proactive_score REAL, reactive_deduction REAL,
+            areas_evaluated INTEGER, low_rated_categories_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS building_address_idx
+            ON toronto_buildings(street_key, civic_start, civic_end);
+        """
+    )
+
+
 def _create_schema(connection: sqlite3.Connection) -> None:
     connection.executescript(
         """
@@ -810,6 +1363,30 @@ def _create_schema(connection: sqlite3.Connection) -> None:
             population_density REAL, median_renter_shelter_cost INTEGER,
             renter_cost_burden_percent REAL
         );
+        CREATE TABLE toronto_collisions (
+            collision_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL,
+            lat REAL NOT NULL, lng REAL NOT NULL, injury INTEGER NOT NULL,
+            fatal INTEGER NOT NULL, pedestrian_involved INTEGER NOT NULL,
+            cyclist_involved INTEGER NOT NULL
+        );
+        CREATE INDEX collision_location_idx ON toronto_collisions(lat, lng);
+        CREATE TABLE toronto_ksi_collisions (
+            collision_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL,
+            lat REAL NOT NULL, lng REAL NOT NULL, fatal INTEGER NOT NULL,
+            pedestrian_involved INTEGER NOT NULL, cyclist_involved INTEGER NOT NULL,
+            other_road_user_involved INTEGER NOT NULL
+        );
+        CREATE INDEX ksi_collision_location_idx ON toronto_ksi_collisions(lat, lng);
+        CREATE TABLE toronto_buildings (
+            rsn TEXT PRIMARY KEY, civic_start INTEGER NOT NULL,
+            civic_end INTEGER NOT NULL, street_key TEXT NOT NULL,
+            site_address TEXT NOT NULL, property_type TEXT, year_built INTEGER,
+            storeys INTEGER, units INTEGER, evaluation_date TEXT,
+            current_score REAL, proactive_score REAL, reactive_deduction REAL,
+            areas_evaluated INTEGER, low_rated_categories_json TEXT NOT NULL
+        );
+        CREATE INDEX building_address_idx
+            ON toronto_buildings(street_key, civic_start, civic_end);
         """
     )
 
@@ -975,6 +1552,9 @@ def _validate_built_snapshot(path: Path) -> None:
                 "bike_share_stations",
                 "toronto_neighbourhood_profiles",
                 "census_subdivisions",
+                "toronto_collisions",
+                "toronto_ksi_collisions",
+                "toronto_buildings",
             )
         }
     finally:

@@ -154,9 +154,20 @@ async def test_synthesize_profile_rejects_unsupported_and_forbidden_claims(monke
         honest_pros=[
             GroundedClaim(text="Crime is low.", evidence_ids=["access"]),
             GroundedClaim(text="Ideal for families.", evidence_ids=["access"]),
+            GroundedClaim(
+                text="Collision history means future risk is high.",
+                evidence_ids=["access"],
+            ),
         ],
         honest_cons=[
-            GroundedClaim(text="Rent is uncertain.", evidence_ids=["missing"])
+            GroundedClaim(text="Rent is uncertain.", evidence_ids=["missing"]),
+            GroundedClaim(
+                text="The mapped lanes make cycling comfortable.",
+                evidence_ids=["access"],
+            ),
+            GroundedClaim(
+                text="This area is routable by bicycle.", evidence_ids=["access"]
+            ),
         ],
     )
 
@@ -182,7 +193,14 @@ async def test_synthesize_profile_rejects_unsupported_and_forbidden_claims(monke
 
     assert result is not None
     assert result.accepted_claim_count == 1
-    assert result.rejected_claim_count == 3
-    assert result.rejected_sections == ("pro", "pro", "con")
+    assert result.rejected_claim_count == 6
+    assert result.rejected_sections == (
+        "pro",
+        "pro",
+        "pro",
+        "con",
+        "con",
+        "con",
+    )
     assert result.profile.honest_pros == []
     assert result.profile.honest_cons == []

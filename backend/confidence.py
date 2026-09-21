@@ -16,6 +16,8 @@ ACTIVE_SOURCES = [
     SourceName.LOCAL,
     SourceName.TRANSIT,
     SourceName.CYCLING,
+    SourceName.COLLISIONS,
+    SourceName.BUILDING,
 ]
 
 
