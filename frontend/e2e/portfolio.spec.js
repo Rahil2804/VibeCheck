@@ -32,10 +32,40 @@ async function mockApi(page, fixture = analysis, health = { status: 'ok', mapbox
     const path = new URL(route.request().url()).pathname;
     let body = {};
     if (path === '/health') body = health;
+    if (path === '/analyze') body = fixture;
     if (path === '/preference-profiles') body = [{ id: 'p1', name: 'Transit first', is_default: true, generic_mode: false, top_priority: 'transit_access', must_haves: [], deal_breakers: [], created_at: '2026-09-16T00:00:00Z', updated_at: '2026-09-16T00:00:00Z' }];
     if (path === '/profiles') body = [{ id: 'r1', place_label: fixture.place.label, confidence_level: 'high', source_statuses: fixture.source_statuses, analysis_lens: fixture.analysis_lens, coverage: fixture.coverage, fit_score: 71, fit_label: 'Good fit', cycling_score: fixture.profile.vibe_scores.cycling_access, cycling_evidence_method: fixture.profile.cycling_context?.method, collision_count: fixture.profile.collision_context?.total_collisions, building_match: fixture.evidence_checks?.some((check) => check.id === 'building') ? Boolean(fixture.profile.building_context) : null, building_score: fixture.profile.building_context?.current_score, created_at: '2026-09-16T00:00:00Z', updated_at: '2026-09-16T00:00:00Z' }];
     if (path === '/profiles/r1') body = { id: 'r1', place_label: fixture.place.label, confidence_level: 'high', source_statuses: fixture.source_statuses, analysis_lens: fixture.analysis_lens, coverage: fixture.coverage, created_at: '2026-09-16T00:00:00Z', updated_at: '2026-09-16T00:00:00Z', analyze_request: { query: fixture.place.label }, response: fixture };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+}
+
+async function mockMapboxSearch(page) {
+  await page.route('https://api.mapbox.com/search/geocode/v6/forward**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        features: [
+          {
+            id: 'address.79-thorncliffe',
+            properties: {
+              mapbox_id: 'address.79-thorncliffe',
+              full_address: '79 Thorncliffe Park Drive, Toronto, Ontario M4H 1L4, Canada',
+            },
+            geometry: { coordinates: [-79.341499, 43.706134] },
+          },
+          {
+            id: 'address.27-thorncliffe',
+            properties: {
+              mapbox_id: 'address.27-thorncliffe',
+              full_address: '27 Thorncliffe Park Drive, Toronto, Ontario M4H 1J8, Canada',
+            },
+            geometry: { coordinates: [-79.3446, 43.7052] },
+          },
+        ],
+      }),
+    });
   });
 }
 
@@ -102,6 +132,73 @@ test('compare opens with shared lens context', async ({ page }) => {
   await page.getByRole('button', { name: 'Compare' }).click();
   await expect(page.getByRole('dialog', { name: 'Compare places' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Compare places' }).getByText('Transit first', { exact: true })).toBeVisible();
+});
+
+test('compare address suggestions expand beyond the slot and preserve the full address', async ({ page }) => {
+  await mockApi(page);
+  await mockMapboxSearch(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Compare' }).click();
+
+  const compare = page.getByRole('dialog', { name: 'Compare places' });
+  const slots = compare.locator('.compare-place-slots');
+  const firstSlot = slots.locator('.compare-place-slot').first();
+  const input = firstSlot.getByRole('textbox');
+  await input.fill('79 Thorncliffe');
+
+  const results = firstSlot.locator('.search-results');
+  await expect(results).toBeVisible();
+  await expect(results.getByRole('button')).toHaveCount(2);
+  expect(await slots.evaluate((element) => getComputedStyle(element).overflowY)).toBe('visible');
+
+  const slotBox = await firstSlot.boundingBox();
+  const resultsBox = await results.boundingBox();
+  expect(resultsBox.y + resultsBox.height).toBeGreaterThan(slotBox.y + slotBox.height);
+
+  const fullAddress = '79 Thorncliffe Park Drive, Toronto, Ontario M4H 1L4, Canada';
+  await results.getByRole('button', { name: fullAddress }).click();
+  await expect(input).toHaveValue(fullAddress);
+  await expect(firstSlot.locator('.compare-slot-topline')).toContainText(fullAddress);
+  await expect(compare.getByText('1 of 4 places')).toBeVisible();
+});
+
+test('analyzed compare results use the framed desktop grid without clipping', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApi(page);
+  await mockMapboxSearch(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Compare' }).click();
+
+  const compare = page.getByRole('dialog', { name: 'Compare places' });
+  const inputs = compare.locator('.compare-place-slot input');
+  await inputs.nth(0).fill('79 Thorncliffe');
+  await compare.locator('.compare-place-slot').nth(0).locator('.search-results button').nth(0).click();
+  await inputs.nth(1).fill('27 Thorncliffe');
+  await compare.locator('.compare-place-slot').nth(1).locator('.search-results button').nth(1).click();
+  await compare.getByRole('button', { name: 'Analyze Compare' }).click();
+
+  const results = compare.locator('.compare-results-grid');
+  await expect(results.locator('.compare-result-card')).toHaveCount(2);
+  expect(await results.evaluate((element) => getComputedStyle(element).display)).toBe('grid');
+  expect(await compare.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(232, 236, 230)');
+  const evidenceLabel = results.locator('.compare-evidence-list span').first();
+  await expect(evidenceLabel).toBeVisible();
+  expect(await evidenceLabel.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(255, 255, 255)');
+
+  const firstCard = results.locator('.compare-result-card').first();
+  const provenanceDetails = firstCard.locator('.compare-detail-panel').filter({ hasText: 'Evidence behind this result' });
+  await expect(provenanceDetails).not.toHaveAttribute('open', '');
+  await provenanceDetails.locator('summary').click();
+  await expect(provenanceDetails).toHaveAttribute('open', '');
+  await expect(provenanceDetails.locator('.provenance-row')).toBeVisible();
+  expect(await firstCard.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+  const viewportWidth = page.viewportSize().width;
+  for (const card of await results.locator('.compare-result-card').all()) {
+    const box = await card.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewportWidth);
+  }
 });
 
 test('saved report exposes scheduled transit, cycling, and unit-matched rent evidence', async ({ page }) => {

@@ -96,12 +96,44 @@ export default function CompareResultCard({ slot, onRetry }) {
           <ul>{response.profile?.honest_cons?.slice(0, 2).map((item) => <li key={item}>{item}</li>)}</ul>
         </div>
       </div>
-      <Confidence confidence={response.confidence} statuses={response.source_statuses} />
-      <Provenance provenance={response.profile?.provenance} />
+      <div className="compare-detail-stack">
+        {response.confidence && (
+          <details className="compare-detail-panel">
+            <summary>
+              <span>
+                <small>Evidence quality</small>
+                <strong>{response.confidence.level} confidence</strong>
+              </span>
+              <span className="compare-detail-count">
+                {formatCount(response.source_statuses?.length, 'source')}
+              </span>
+            </summary>
+            <Confidence confidence={response.confidence} statuses={response.source_statuses} />
+          </details>
+        )}
+        {response.profile?.provenance?.items?.length > 0 && (
+          <details className="compare-detail-panel">
+            <summary>
+              <span>
+                <small>Source support</small>
+                <strong>Evidence behind this result</strong>
+              </span>
+              <span className="compare-detail-count">
+                {formatCount(response.profile.provenance.items.length, 'claim')}
+              </span>
+            </summary>
+            <Provenance provenance={response.profile.provenance} />
+          </details>
+        )}
+      </div>
     </article>
   );
 }
 
 function formatNumber(value) {
   return new Intl.NumberFormat('en-CA', { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatCount(value = 0, label) {
+  return `${value} ${label}${value === 1 ? '' : 's'}`;
 }
