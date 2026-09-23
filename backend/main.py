@@ -13,9 +13,9 @@ from backend.models import (
     PreferenceProfile,
     PreferenceProfileCreate,
     PreferenceProfileUpdate,
-    SaveProfileRequest,
     SavedProfile,
     SavedProfileSummary,
+    SaveProfileRequest,
 )
 from backend.pipeline import analyze_neighborhood
 from backend.storage import (

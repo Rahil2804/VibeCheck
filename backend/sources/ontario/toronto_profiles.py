@@ -8,7 +8,6 @@ from openpyxl import load_workbook
 from backend.models import Coordinates
 from backend.snapshot import snapshot_connection
 
-
 TORONTO_NEIGHBOURHOODS_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
     "fc443770-ef0a-4025-9c2c-2cb558bfab00/resource/"

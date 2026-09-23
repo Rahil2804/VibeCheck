@@ -34,7 +34,6 @@ from backend.sources.ontario.toronto_profiles import (
     with_derived_population_density,
 )
 
-
 CMHC_URL = (
     "https://assets.cmhc-schl.gc.ca/sites/cmhc/professional/housing-markets-data-and-"
     "research/housing-data-tables/rental-market/rental-market-report-data-tables/2025/"

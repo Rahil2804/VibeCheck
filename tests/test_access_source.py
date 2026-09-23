@@ -1,10 +1,11 @@
-from unittest.mock import AsyncMock, Mock
 from datetime import timedelta
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
 
 from backend.models import AnalyzeRequest, Coordinates, Place
+from backend.source_cache import set_cached_source
 from backend.sources.access import (
     ACCESS_RADIUS_METERS,
     _should_cool_down,
@@ -12,7 +13,6 @@ from backend.sources.access import (
     fetch_access_context,
     normalize_access_payload,
 )
-from backend.source_cache import set_cached_source
 from backend.sources.common import SourceContext
 
 

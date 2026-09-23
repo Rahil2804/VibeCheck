@@ -16,7 +16,6 @@ from backend.models import (
     SynthesisStatusCode,
 )
 
-
 SOURCE_CHECKS = (
     (SourceName.ACCESS, "access", "Everyday access"),
     (SourceName.CENSUS, "census", "Census context"),

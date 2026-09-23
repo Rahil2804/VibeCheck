@@ -16,7 +16,6 @@ from backend.sources.ontario.toronto_profiles import (
     normalize_toronto_neighbourhood_profile,
 )
 
-
 TORONTO_PARKS_PACKAGE_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show"
     "?id=parks-and-recreation-facilities"

@@ -14,7 +14,6 @@ from backend.sources.ontario.toronto_profiles import (
     lookup_bundled_toronto_profile,
 )
 
-
 CENSUS_YEAR = 2021
 BOUNDARY_QUERY_URL = (
     "https://geo.statcan.gc.ca/geo_wa/rest/services/2021/"

@@ -1,8 +1,7 @@
 import httpx
 import pytest
 
-from backend.models import AnalyzeRequest, Place
-from backend.models import Coordinates
+from backend.models import AnalyzeRequest, Coordinates, Place
 from backend.sources.common import SourceContext
 from backend.sources.ontario import toronto
 from backend.sources.ontario.toronto import (
@@ -10,7 +9,6 @@ from backend.sources.ontario.toronto import (
     normalize_toronto_open_data,
     summarize_amenity_records,
 )
-
 
 CENTER = Coordinates(lat=43.654, lng=-79.401)
 

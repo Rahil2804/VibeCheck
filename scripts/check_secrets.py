@@ -4,7 +4,6 @@ import re
 import subprocess
 from pathlib import Path
 
-
 PATTERNS = {
     "OpenAI API key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}"),
     "Mapbox token": re.compile(r"\bpk\.eyJ[A-Za-z0-9._-]{20,}"),

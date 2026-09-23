@@ -8,4 +8,4 @@ pydantic
 pytest
 pytest-asyncio
 respx
-ruff
+ruff==0.15.12

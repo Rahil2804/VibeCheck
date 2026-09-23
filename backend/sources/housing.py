@@ -7,7 +7,6 @@ from backend.snapshot import load_manifest, snapshot_connection
 from backend.sources.common import SourceContext, SourceResult
 from backend.sources.local import is_gta_place
 
-
 CMHC_SOURCE_URL = (
     "https://www.cmhc-schl.gc.ca/professionals/housing-markets-data-and-research/"
     "market-reports/rental-market-reports-major-centres?ap=a1-p1"

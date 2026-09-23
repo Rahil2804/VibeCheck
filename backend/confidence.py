@@ -8,7 +8,6 @@ from backend.models import (
     SourceStatusCode,
 )
 
-
 ACTIVE_SOURCES = [
     SourceName.CENSUS,
     SourceName.HOUSING,

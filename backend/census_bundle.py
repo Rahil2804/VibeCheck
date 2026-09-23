@@ -7,7 +7,6 @@ from backend.models import Coordinates
 from backend.snapshot import snapshot_connection
 from backend.sources.ontario.toronto_profiles import geometry_contains
 
-
 STATCAN_CENSUS_PROFILE_URL = (
     "https://www12.statcan.gc.ca/census-recensement/2021/dp-pd/prof/details/"
     "download-telecharger/comp/getFile.cfm?LANG=E&GEONO=005&FILETYPE=CSV"

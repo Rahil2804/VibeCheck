@@ -1,12 +1,14 @@
 import json
 import sqlite3
 import zipfile
-from io import BytesIO
 from datetime import date
+from io import BytesIO
 
 import pytest
 from openpyxl import Workbook
 
+from backend.census_bundle import lookup_bundled_census_subdivision
+from backend.geography import resolve_geography
 from backend.models import (
     AnalyzeRequest,
     Coordinates,
@@ -14,22 +16,20 @@ from backend.models import (
     RentalUnitSize,
     SourceName,
 )
-from backend.census_bundle import lookup_bundled_census_subdivision
-from backend.geography import resolve_geography
-from backend.score_signals import resolve_score_support, resolve_vibe_scores
 from backend.pipeline import _build_profile
+from backend.score_signals import resolve_score_support, resolve_vibe_scores
 from backend.sources.common import SourceContext
 from backend.sources.cycling import score_cycling_access
 from backend.sources.housing import lookup_rent_benchmark
 from backend.sources.transit import fetch_transit_context, score_scheduled_transit
+from scripts import refresh_gta_snapshot
 from scripts.refresh_gta_snapshot import (
     _create_schema,
     active_service_ids,
-    normalize_cmhc_workbook,
     normalize_census_subdivisions,
+    normalize_cmhc_workbook,
     parse_gtfs_time,
 )
-from scripts import refresh_gta_snapshot
 
 
 def test_gtfs_calendar_exceptions_and_after_midnight_times():

@@ -18,7 +18,6 @@ from backend.sources.osm import (
     score_cycling_lengths,
 )
 
-
 NETWORK_RADIUS_M = CYCLING_RADIUS_METERS
 BIKE_SHARE_RADIUS_M = 800
 SOURCE_URL = "https://open.toronto.ca/dataset/major-city-wide-cycling-routes/"

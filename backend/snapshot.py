@@ -9,7 +9,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "snapshots"
 DEFAULT_SNAPSHOT_PATH = SNAPSHOT_DIR / "gta_snapshot.sqlite"
 DEFAULT_MANIFEST_PATH = SNAPSHOT_DIR / "manifest.json"

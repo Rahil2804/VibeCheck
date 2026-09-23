@@ -7,7 +7,6 @@ from typing import Any
 from backend.snapshot import load_manifest, snapshot_connection
 from backend.sources.common import SourceContext, SourceResult
 
-
 NORMAL_STOP_RADIUS_M = 800
 RAPID_STOP_RADIUS_M = 1_200
 RAPID_ROUTE_TYPES = {0, 1, 2}

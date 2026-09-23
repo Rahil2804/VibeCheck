@@ -6,7 +6,6 @@ from typing import Any
 from backend.snapshot import load_manifest, partition_is_stale, snapshot_connection
 from backend.sources.common import SourceContext, SourceResult
 
-
 RADIUS_M = 1_000
 MAX_MAP_POINTS = 100
 ALL_COLLISIONS_URL = "https://open.toronto.ca/dataset/traffic-collisions/"

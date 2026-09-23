@@ -29,6 +29,7 @@ from backend.models import (
 from backend.provenance import build_profile_provenance
 from backend.score_signals import resolve_vibe_scores
 from backend.scorer import score_fit
+from backend.snapshot import snapshot_health
 from backend.sources.access import fetch_access_context
 from backend.sources.building import fetch_building_context
 from backend.sources.census import fetch_census_context
@@ -39,7 +40,6 @@ from backend.sources.housing import fetch_housing_context
 from backend.sources.local import fetch_local_context
 from backend.sources.mapbox import resolve_place
 from backend.sources.transit import fetch_transit_context
-from backend.snapshot import snapshot_health
 from backend.synthesizer import (
     PROMPT_VERSION,
     SynthesizedProfileResult,

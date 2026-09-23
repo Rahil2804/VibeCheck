@@ -4,7 +4,6 @@ from backend.census_bundle import lookup_bundled_census_subdivision
 from backend.models import GeographyContext, Place
 from backend.sources.ontario.toronto_profiles import lookup_bundled_toronto_profile
 
-
 TORONTO_BOUNDS = (43.58, 43.86, -79.64, -79.11)
 GTA_BOUNDS = (43.40, 44.25, -80.15, -78.75)
 TORONTO_ALIASES = {

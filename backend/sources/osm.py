@@ -16,7 +16,6 @@ from backend.source_cache import (
 )
 from backend.sources.common import SourceContext, SourceResult
 
-
 OVERPASS_URLS = (
     "https://overpass-api.de/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",

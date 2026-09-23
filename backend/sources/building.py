@@ -7,7 +7,6 @@ from typing import Any, NamedTuple
 from backend.snapshot import load_manifest, partition_is_stale, snapshot_connection
 from backend.sources.common import SourceContext, SourceResult
 
-
 REGISTRATION_URL = (
     "https://open.toronto.ca/dataset/apartment-building-registration/"
 )

@@ -1,5 +1,5 @@
-from backend.models import Place
 from backend.geography import resolve_geography
+from backend.models import Place
 from backend.sources.common import SourceContext, SourceResult
 
 GTA_MUNICIPALITIES = {

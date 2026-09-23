@@ -7,7 +7,6 @@ from backend.models import (
 )
 from backend.sources.local import is_gta_place, is_toronto_place
 
-
 SCORE_LABELS = {
     "walkability": "Walkability",
     "transit_access": "Transit access",
