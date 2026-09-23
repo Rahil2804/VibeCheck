@@ -77,7 +77,8 @@ async def synthesize_profile(
     client: AsyncOpenAI | Any | None = None,
     source_data: dict[str, Any] | None = None,
 ) -> SynthesizedProfileResult | None:
-    if not os.getenv("OPENAI_API_KEY"):
+    model = get_openai_model()
+    if not os.getenv("OPENAI_API_KEY", "").strip() or model is None:
         return None
 
     evidence_payload = evidence or {
@@ -85,7 +86,6 @@ async def synthesize_profile(
         "legacy_source_data": source_data or {},
     }
     openai_client = client or AsyncOpenAI(timeout=12, max_retries=1)
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     started = monotonic()
 
     try:
@@ -124,6 +124,10 @@ async def synthesize_profile(
         duration_ms=round((monotonic() - started) * 1000),
         rejected_sections=rejected_sections,
     )
+
+
+def get_openai_model() -> str | None:
+    return os.getenv("OPENAI_MODEL", "").strip() or None
 
 
 def _ground_profile(

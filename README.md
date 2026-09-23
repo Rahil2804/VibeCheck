@@ -278,9 +278,11 @@ Vite reads environment variables when it starts. Restart the frontend after chan
 |---|---:|---|---|
 | `MAPBOX_TOKEN` | Yes | Server-side place resolution | — |
 | `OPENAI_API_KEY` | No | Evidence-grounded narrative generation | Deterministic narrative |
-| `OPENAI_MODEL` | No | OpenAI model name | `gpt-4o-mini` |
+| `OPENAI_MODEL` | When enabling AI | Responses API model ID available to your OpenAI project | — |
 | `SOURCE_TIMEOUT_SECONDS` | No | Live-source timeout | `8` |
 | `SQLITE_PATH` | No | Local application database | `data/vibecheck.db` |
+
+OpenAI is optional. To enable AI-written narrative, set both `OPENAI_API_KEY` and `OPENAI_MODEL`; choose the model that fits your own quality, latency, access, and cost requirements. If either value is blank, VibeCheck uses its deterministic narrative instead. See the [official model-selection guide](https://developers.openai.com/api/docs/guides/model-selection) for current options.
 
 ### Frontend — `frontend/.env`
 

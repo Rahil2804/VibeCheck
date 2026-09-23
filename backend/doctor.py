@@ -15,12 +15,14 @@ from backend.snapshot import snapshot_health
 from backend.sources.access import OVERPASS_URLS, fetch_access_context
 from backend.sources.common import SourceContext
 from backend.storage import get_database_path, initialize_database
-from backend.synthesizer import synthesize_profile
+from backend.synthesizer import get_openai_model, synthesize_profile
 
 
 def collect_health() -> dict[str, Any]:
     mapbox_configured = bool(os.getenv("MAPBOX_TOKEN", "").strip())
-    openai_configured = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    openai_key_configured = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    openai_model = get_openai_model()
+    openai_configured = openai_key_configured and openai_model is not None
     sqlite_check = _sqlite_health(get_database_path())
     snapshot_check = snapshot_health()
     required_ready = (
@@ -31,10 +33,9 @@ def collect_health() -> dict[str, Any]:
         "mapbox": {"configured": mapbox_configured},
         "openai": {
             "configured": openai_configured,
+            "api_key_configured": openai_key_configured,
             "required": False,
-            "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-            if openai_configured
-            else None,
+            "model": openai_model,
         },
         "snapshot": snapshot_check,
         "sqlite": sqlite_check,
@@ -112,6 +113,8 @@ async def _live_osm_check() -> dict[str, Any]:
 async def _live_openai_check() -> dict[str, Any]:
     if not os.getenv("OPENAI_API_KEY", "").strip():
         return {"ready": False, "error": "not_configured"}
+    if get_openai_model() is None:
+        return {"ready": False, "error": "model_not_configured"}
     started = datetime.now(UTC)
     try:
         result = await synthesize_profile(

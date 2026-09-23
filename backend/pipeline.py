@@ -43,6 +43,7 @@ from backend.sources.transit import fetch_transit_context
 from backend.synthesizer import (
     PROMPT_VERSION,
     SynthesizedProfileResult,
+    get_openai_model,
     synthesize_profile,
 )
 
@@ -179,7 +180,11 @@ async def analyze_neighborhood(
         evidence_checks=evidence_checks,
     )
     synthesizer = profile_synthesizer or synthesize_profile
-    model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    configured_model = get_openai_model()
+    model_name = configured_model or ("custom" if profile_synthesizer else None)
+    synthesizer_configured = profile_synthesizer is not None or bool(
+        os.getenv("OPENAI_API_KEY", "").strip() and configured_model
+    )
     ai_evidence = _build_ai_evidence(
         checks=evidence_checks,
         source_data=source_data,
@@ -198,14 +203,14 @@ async def analyze_neighborhood(
             "insufficient_evidence"
             if len(fact_checks) < 2
             else "not_configured"
-            if not os.getenv("OPENAI_API_KEY")
+            if not synthesizer_configured
             else None
         ),
         prompt_version=PROMPT_VERSION,
         evidence_count=len(fact_checks),
     )
     profile: NeighborhoodProfile = fallback_profile
-    if len(fact_checks) >= 2:
+    if len(fact_checks) >= 2 and synthesizer_configured:
         try:
             result = await synthesizer(
                 place_label=place.label,
@@ -383,7 +388,7 @@ def _apply_synthesis_result(
     *,
     result: Any,
     fallback_profile: NeighborhoodProfile,
-    model_name: str,
+    model_name: str | None,
     evidence_count: int,
 ) -> tuple[NeighborhoodProfile, SynthesisStatus]:
     if result is None:
@@ -391,9 +396,7 @@ def _apply_synthesis_result(
             status=SynthesisStatusCode.SKIPPED,
             model=None,
             message="AI narrative was not configured; deterministic copy was used.",
-            reason_code="not_configured"
-            if not os.getenv("OPENAI_API_KEY")
-            else "no_output",
+            reason_code="not_configured" if model_name is None else "no_output",
             prompt_version=PROMPT_VERSION,
             evidence_count=evidence_count,
         )

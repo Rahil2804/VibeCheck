@@ -28,6 +28,20 @@ def test_health_returns_ok():
     assert "snapshot_id" in body["snapshot"]
 
 
+def test_health_requires_an_explicit_openai_model(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_MODEL", "")
+    client = TestClient(app)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    openai = response.json()["openai"]
+    assert openai["api_key_configured"] is True
+    assert openai["configured"] is False
+    assert openai["model"] is None
+
+
 def test_analyze_returns_partial_profile_for_valid_query():
     client = TestClient(app)
 

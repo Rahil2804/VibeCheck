@@ -64,7 +64,7 @@ const response = {
   fit: { score: 70, label: 'Good fit', explanation: 'Evidence-backed fit.', flags: [], factors: [{ signal: 'Transit', value: 75, impact: 15, explanation: 'Transit is strong.', source_fields: ['access.transit_access'] }] },
   confidence: { level: 'medium', caveats: [] },
   source_statuses: [],
-  synthesis: { status: 'used', model: 'gpt-4o-mini', message: 'Grounded narrative.' },
+  synthesis: { status: 'used', model: 'test-model', message: 'Grounded narrative.' },
   evidence_checks: [
     { id: 'access', label: 'Everyday access', status: 'supported', summary: 'OSM access returned.', updated_at: '2026-09-16T00:00:00Z', source_fields: ['access.daily_needs'] },
     { id: 'transit', label: 'Scheduled transit', status: 'stale', summary: 'Schedule is expired.' },
@@ -166,7 +166,7 @@ describe('portfolio flows', () => {
   it('renders nullable fit and partially grounded synthesis honestly', () => {
     const partial = structuredClone(response);
     partial.fit = { score: null, label: 'Not enough evidence', explanation: 'No evidence-backed factor was available.', flags: [], factors: [] };
-    partial.synthesis = { status: 'partial', model: 'gpt-4o-mini', message: 'One claim was replaced.' };
+    partial.synthesis = { status: 'partial', model: 'test-model', message: 'One claim was replaced.' };
     render(<Profile response={partial} lensIsStale={false} onSave={vi.fn()} />);
     expect(screen.getByText('Partially AI-grounded')).toBeInTheDocument();
     expect(screen.getByText('Not enough evidence')).toBeInTheDocument();

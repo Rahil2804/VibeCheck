@@ -26,6 +26,20 @@ async def test_synthesize_profile_returns_none_without_api_key(monkeypatch):
     assert result is None
 
 
+@pytest.mark.asyncio
+async def test_synthesize_profile_returns_none_without_explicit_model(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+
+    result = await synthesize_profile(
+        place_label="East Austin",
+        source_data={"access": {"walkability": 82}},
+        caveats=[],
+    )
+
+    assert result is None
+
+
 def test_parse_profile_payload_accepts_schema_valid_profile():
     profile = parse_profile_payload(
         {
@@ -79,6 +93,7 @@ def test_synthesized_profile_payload_schema_has_no_open_ended_objects():
 @pytest.mark.asyncio
 async def test_synthesize_profile_uses_openai_safe_payload_schema(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_MODEL", "test-model")
     captured = {}
 
     parsed_payload = SynthesizedProfilePayload(
@@ -128,6 +143,7 @@ async def test_synthesize_profile_uses_openai_safe_payload_schema(monkeypatch):
 @pytest.mark.asyncio
 async def test_synthesize_profile_converts_client_error_to_unavailable(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_MODEL", "test-model")
 
     class FailingClient:
         class responses:
@@ -147,6 +163,7 @@ async def test_synthesize_profile_converts_client_error_to_unavailable(monkeypat
 @pytest.mark.asyncio
 async def test_synthesize_profile_rejects_unsupported_and_forbidden_claims(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_MODEL", "test-model")
     parsed_payload = SynthesizedProfilePayload(
         overview=GroundedClaim(
             text="Everyday access evidence is available.", evidence_ids=["access"]

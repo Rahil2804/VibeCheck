@@ -17,7 +17,7 @@ const analysis = {
   fit: { score: 71, label: 'Good fit', explanation: 'Two evidence-backed factors moved this fit.', flags: [], factors: [{ signal: 'Transit access', value: 86, impact: 15, explanation: 'Transit is strongly supported.', source_fields: ['access.transit_access'] }] },
   confidence: { level: 'high', available_sources: ['census', 'housing', 'access', 'local'], missing_sources: [], caveats: [] },
   source_statuses: [{ source: 'access', status: 'success', message: 'OSM returned.', updated_at: '2026-09-16T00:00:00Z' }],
-  synthesis: { status: 'used', model: 'gpt-4o-mini', message: 'Validated evidence narrative.' },
+  synthesis: { status: 'used', model: 'test-model', message: 'Validated evidence narrative.' },
   evidence_checks: [
     { id: 'access', label: 'Everyday access', status: 'supported', summary: 'OSM access returned.', source_fields: ['access.daily_needs'] },
     { id: 'census', label: 'Census context', status: 'supported', summary: 'Bundled Census context returned.' },
@@ -334,7 +334,7 @@ test('saved report shows a clear no-exact-building-match state', async ({ page }
 test('partial evidence and grounded synthesis states stay explicit', async ({ page }) => {
   const fixture = structuredClone(analysis);
   fixture.fit = { score: null, label: 'Not enough evidence', explanation: 'No evidence-backed factor was available.', flags: [], factors: [] };
-  fixture.synthesis = { status: 'partial', model: 'gpt-4o-mini', message: 'One claim was replaced.' };
+  fixture.synthesis = { status: 'partial', model: 'test-model', message: 'One claim was replaced.' };
   fixture.evidence_checks = [
     { id: 'access', label: 'Everyday access', status: 'fallback', summary: 'Using stale OSM evidence.' },
     { id: 'census', label: 'Census context', status: 'unavailable', summary: 'No Census context.' },
